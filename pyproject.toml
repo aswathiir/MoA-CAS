@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "moa-cas-benchmark"
+version = "0.1.0"
+description = "IndicConformer baseline benchmark for MoA-CAS"
+authors = ["Aswathi Ranjith"]
+
+[tool.poetry.dependencies]
+python       = "^3.10"
+torch        = ">=2.1.0"
+torchaudio   = ">=2.1.0"
+transformers = ">=4.40.0"
+datasets     = ">=2.18.0"
+jiwer        = ">=3.0.0"
+tqdm         = ">=4.66.0"
+soundfile    = ">=0.12.1"
+scipy        = ">=1.11.0"
+
+[build-system]
+requires      = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
