@@ -1,18 +1,17 @@
 """
-download_model.py
------------------
-Run this ONCE before benchmark.py.
+scripts/download_model.py
+-----------------------------
+Run this ONCE before scripts/benchmark.py.
 Downloads IndicConformer-600M to HuggingFace cache and verifies it loads.
 
 Steps before running:
 1. Go to https://huggingface.co/ai4bharat/indic-conformer-600m-multilingual
 2. Click "Agree and access repository" (one-time, needs HF account)
 3. Run: huggingface-cli login
-4. Run: python download_model.py
+4. Run: python scripts/download_model.py
 """
 
 import torch
-import torchaudio
 from transformers import AutoModel
 
 MODEL_ID  = "ai4bharat/indic-conformer-600m-multilingual"
@@ -46,7 +45,7 @@ def download_and_verify():
         result = model(dummy_wav, "hi", "ctc")
 
     print(f"Sanity check passed. Output: '{result}'")
-    print("\nModel is ready. You can now run benchmark.py.")
+    print("\nModel is ready. You can now run scripts/benchmark.py.")
 
 
 if __name__ == "__main__":

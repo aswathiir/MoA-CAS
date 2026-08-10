@@ -1,6 +1,6 @@
 """
-core/reporting.py
------------------
+moa_cas/reporting.py
+----------------------
 Console summary tables and CSV output.
 Includes a comparison table for monolingual vs code-mixed results.
 """

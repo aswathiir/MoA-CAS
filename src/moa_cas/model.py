@@ -1,6 +1,6 @@
 """
-core/model.py
--------------
+moa_cas/model.py
+-----------------
 Load IndicConformer from HuggingFace and run single-utterance inference.
 
 Supported language codes (22 scheduled Indian languages):

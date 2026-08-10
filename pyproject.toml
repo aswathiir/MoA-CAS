@@ -1,8 +1,9 @@
 [tool.poetry]
-name = "moa-cas-benchmark"
+name = "moa-cas"
 version = "0.1.0"
-description = "IndicConformer baseline benchmark for MoA-CAS"
+description = "MoA-CAS: Mixture-of-Adapters for Code-Switched ASR — data pipeline + IndicConformer baseline"
 authors = ["Aswathi Ranjith"]
+packages = [{ include = "moa_cas", from = "src" }]
 
 [tool.poetry.dependencies]
 python       = "^3.10"
@@ -14,6 +15,10 @@ jiwer        = ">=3.0.0"
 tqdm         = ">=4.66.0"
 soundfile    = ">=0.12.1"
 scipy        = ">=1.11.0"
+pyyaml       = ">=6.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = ">=8.0.0"
 
 [build-system]
 requires      = ["poetry-core"]

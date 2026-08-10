@@ -1,0 +1,42 @@
+# Registry of preprocessing-pipeline targets.
+#
+# Run:  python scripts/build_manifest.py --config <name>
+#       python scripts/build_manifest.py --list
+#
+# Each entry is either a "mucs" (raw Kaldi, code-switched) or "indicvoices"
+# (HF-streamed, monolingual baseline) target. Code-switched and monolingual
+# targets are paired per language so degradation monitoring (Shah et al.
+# 2020) has a matching clean-speech set for every code-mixed one.
+
+mucs_hi_en_test:
+  adapter: mucs
+  lang_pair: hi-en
+  raw_dir: data/raw/mucs/hi-en/test
+  out_wav_dir: data/processed/mucs/hi-en/test
+  split: test
+  out_manifest: data/manifests/mucs_hi-en_test.jsonl
+
+mucs_bn_en_test:
+  adapter: mucs
+  lang_pair: bn-en
+  raw_dir: data/raw/mucs/bn-en/test
+  out_wav_dir: data/processed/mucs/bn-en/test
+  split: test
+  out_manifest: data/manifests/mucs_bn-en_test.jsonl
+  # NOTE: no local data yet. Download the Bengali-English package from
+  # https://www.openslr.org/104/ and extract it into raw_dir (Kaldi layout)
+  # before running this target.
+
+indicvoices_hi_valid:
+  adapter: indicvoices
+  lang: hindi
+  split: valid
+  limit: 200
+  out_manifest: data/manifests/indicvoices_hi_valid.jsonl
+
+indicvoices_bn_valid:
+  adapter: indicvoices
+  lang: bengali
+  split: valid
+  limit: 200
+  out_manifest: data/manifests/indicvoices_bn_valid.jsonl

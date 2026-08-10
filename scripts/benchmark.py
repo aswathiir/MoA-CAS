@@ -1,40 +1,43 @@
 """
-benchmark.py
-------------
+scripts/benchmark.py
+------------------------
 Runs IndicConformer on IndicVoices (monolingual baseline) and/or MUCS
 (code-switched) to document the gap that motivates MoA-CAS.
 
 Usage
 -----
 # Monolingual baseline only (needs HF login)
-poetry run python benchmark.py --dataset indicvoices --limit 100
+poetry run python scripts/benchmark.py --dataset indicvoices --limit 100
 
-# Code-mixed gap only (needs MUCS downloaded locally)
-poetry run python benchmark.py --dataset mucs --mucs-manifest data/hindi_test.json --limit 100
+# Code-mixed gap only (needs a MUCS manifest — see scripts/build_manifest.py)
+poetry run python scripts/benchmark.py --dataset mucs --mucs-manifest data/manifests/mucs_hi-en_test.jsonl --limit 100
 
 # Full comparison — runs both and prints the gap table (Table 1 in paper)
-poetry run python benchmark.py --dataset compare --mucs-manifest data/hindi_test.json --limit 100
+poetry run python scripts/benchmark.py --dataset compare --mucs-manifest data/manifests/mucs_hi-en_test.jsonl --limit 100
 
 Notes
 -----
 - lang is always "hi" here — IndicConformer has no English or code-mix mode.
   On monolingual Hindi it gives its best result.
   On Hindi-English code-mix it degrades — that delta is the gap.
-- MUCS download: https://www.openslr.org/104/
+- MUCS manifests are built from raw data via scripts/build_manifest.py.
 """
 
 import argparse
-import torch
+import sys
 from pathlib import Path
 from collections import defaultdict
-from tqdm import tqdm
-from datasets import load_dataset, Audio
 
-from core import load_model, transcribe, prepare_audio
-from core import compute_wer, compute_cer
-from core import print_summary, print_breakdown, print_comparison, save_csv
-from core.model import SUPPORTED_LANGS
-from core.dataset import load_indicvoices, iv_sample, load_mucs, mucs_sample
+import torch
+from tqdm import tqdm
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from moa_cas.model import load_model, transcribe
+from moa_cas.audio_io import prepare_audio
+from moa_cas.metrics import compute_wer, compute_cer
+from moa_cas.reporting import print_summary, print_breakdown, print_comparison, save_csv
+from moa_cas.datasets import load_indicvoices, iv_sample, load_mucs, mucs_sample
 
 LANG   = "hi"    # fixed — both datasets benchmarked under Hindi decoding
 DECODE = "ctc"
@@ -109,7 +112,7 @@ def run(args):
         if not args.mucs_manifest:
             print(
                 "\n  --mucs-manifest is required for MUCS runs.\n"
-                "  Download from https://www.openslr.org/104/ then re-run.\n"
+                "  Build one with: python scripts/build_manifest.py --config mucs_hi_en_test\n"
             )
             return
         print("\n── Run 2: MUCS Hindi-English (code-mixed gap) ──")

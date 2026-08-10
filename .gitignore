@@ -1,0 +1,13 @@
+venv/
+**/__pycache__/
+poetry.lock
+.pytest_cache/
+*.egg-info/
+
+# Raw and intermediate corpus data — large, reproducible from source via
+# scripts/build_manifest.py. Only the generated manifests (data/manifests/)
+# are tracked; results/ (benchmark CSVs) stays tracked too — small and it's
+# the evidence backing the project's headline numbers.
+data/raw/
+data/processed/
+

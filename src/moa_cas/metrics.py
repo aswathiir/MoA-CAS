@@ -1,7 +1,7 @@
 """
-core/metrics.py
----------------
-Text normalization + WER / CER computation.
+moa_cas/metrics.py
+-------------------
+Text normalization + WER / CER computation for benchmark evaluation.
 """
 
 import re

@@ -1,13 +1,16 @@
 """
-core/audio.py
--------------
-Audio preprocessing: decode → resample to 16 kHz → mono (1, T) tensor.
+moa_cas/audio_io.py
+--------------------
+Runtime audio loading for model inference: decode -> resample to 16 kHz -> mono (1, T) tensor.
 
 Handles two sources:
   hf_bytes   : Audio(decode=False) dict from HuggingFace {"bytes": ..., "path": ...}
   local_path : string path to a local WAV file (MUCS)
 
 soundfile is used for decoding in both cases — no torchcodec needed.
+
+This is distinct from preprocessing/audio.py, which extracts and resamples
+corpus audio to disk once, offline, ahead of training/eval.
 """
 
 import io
@@ -45,13 +48,13 @@ def _from_path(path: str, device: str) -> torch.Tensor:
 
 
 def _to_tensor(wav_np, sr: int, device: str) -> torch.Tensor:
-    """Shared postprocessing: numpy → tensor → resample → mono → device."""
+    """Shared postprocessing: numpy -> tensor -> resample -> mono -> device."""
     wav = torch.tensor(wav_np, dtype=torch.float32)
 
     if wav.ndim == 1:
-        wav = wav.unsqueeze(0)                        # (T,) → (1, T)
+        wav = wav.unsqueeze(0)                        # (T,) -> (1, T)
     elif wav.shape[0] > 1:
-        wav = wav.mean(dim=0, keepdim=True)            # stereo → mono
+        wav = wav.mean(dim=0, keepdim=True)            # stereo -> mono
 
     if sr != TARGET_SR:
         wav = torchaudio.functional.resample(wav, sr, TARGET_SR)
