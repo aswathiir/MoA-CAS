@@ -11,6 +11,7 @@ Usage
 """
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -81,3 +82,10 @@ if __name__ == "__main__":
         run(args.config)
     else:
         parser.error("Pass --config <name> or --list")
+
+    # HuggingFace's streaming path (indicvoices adapter) can leave a
+    # non-daemon background networking thread alive after this script's own
+    # work is done, which otherwise hangs the process indefinitely instead
+    # of exiting. Our work above is already flushed to disk, so force exit.
+    sys.stdout.flush()
+    os._exit(0)

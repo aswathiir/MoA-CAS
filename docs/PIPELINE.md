@@ -88,6 +88,19 @@ Add a new corpus split by adding an entry to `configs/datasets.yaml` — no
 code changes needed unless it's a genuinely new *kind* of source (not
 Kaldi, not HuggingFace-streamed).
 
+### Known gotcha: force-exit on the HuggingFace-streamed path
+
+Running an `indicvoices_*` target streams a parquet file straight from
+HuggingFace. Once, that left a background networking thread alive after the
+script's own work was already done and printed — the process just sat
+there instead of exiting, for over an hour, with no further output. The
+script's own logic wasn't hung; a thread it doesn't control was. Rather
+than chase that thread down, `scripts/build_manifest.py` now force-exits
+(`os._exit(0)`) right after writing its output, once its own work is
+provably done. You may see a harmless `resource_tracker: leaked semaphore`
+warning on exit — that's the price of skipping normal cleanup, not a sign
+anything is wrong.
+
 ## What's not built yet
 
 - Only MUCS Hindi-English **test** (5h) has been run through this — the
