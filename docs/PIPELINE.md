@@ -1,4 +1,4 @@
-# Data pipeline — plain-English guide
+# Data pipeline 
 
 No research framing here — just what the code in `src/moa_cas/` and
 `scripts/build_manifest.py` actually does, in order, and where to find each
