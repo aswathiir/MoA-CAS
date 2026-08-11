@@ -32,6 +32,14 @@ window out of its parent recording, downmixes to mono, resamples to 16kHz
 This is offline, one-time work — it caches the cut files so re-running
 doesn't re-slice audio that's already there.
 
+For a large split (e.g. the 90-hour Hindi-English train set), extracting
+every raw recording to disk first can need more space than you have free
+alongside the downloaded archive. `extract_kaldi_split_from_tar` handles
+this case: it makes one sequential pass through the `.tar.gz`, reads each
+recording into memory, slices out all of that recording's sentences, and
+discards it before moving to the next — the full raw recording set is
+never sitting on disk at once, only the small cut-up sentences are.
+
 **3. Tag every word's language** — [`preprocessing/text.py`](../src/moa_cas/preprocessing/text.py)
 For each transcription, splits it into words and looks at the Unicode
 range each character falls in: Devanagari letters → Hindi, Bengali letters
@@ -103,10 +111,18 @@ anything is wrong.
 
 ## What's not built yet
 
-- Only MUCS Hindi-English **test** (5h) has been run through this — the
-  90h train split isn't downloaded locally.
-- Bengali-English config exists in `datasets.yaml` but there's no local
-  Bengali audio to run it against yet.
-- No augmentation (synthetic code-mixing, LLM/TTS-generated data) — that's
+All four MUCS code-switched splits (Hindi-English and Bengali-English,
+train and test) and both IndicVoices monolingual baselines have been run
+end-to-end — see [WHAT_WAS_DONE.md](WHAT_WAS_DONE.md) for the actual
+numbers. What's still open:
+
+- **A held-out dev split** — `pipeline/splits.py::speaker_disjoint_split`
+  exists but hasn't been used yet; MUCS's own train/test split was used
+  as-is. Carving a dev set out of train (for model-selection during
+  training) is a one-line call away, not a missing feature.
+- **No augmentation** (synthetic code-mixing, LLM/TTS-generated data) —
   intentionally out of scope for this pipeline; see the project doc's
   Track 2 for when that becomes relevant.
+- **No Tamil/Telugu** — MUCS simply has no code-switched audio for those
+  languages (monolingual only), so there's nothing this pipeline can build
+  for that axis without a different corpus or synthetic data.

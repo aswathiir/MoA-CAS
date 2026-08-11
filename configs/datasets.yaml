@@ -16,6 +16,20 @@ mucs_hi_en_test:
   split: test
   out_manifest: data/manifests/mucs_hi-en_test.jsonl
 
+mucs_hi_en_train:
+  adapter: mucs
+  lang_pair: hi-en
+  # Streamed straight out of the .tar.gz (see extract_kaldi_split_from_tar) —
+  # the 90h train split's extracted audio (~18GB) doesn't fit on disk
+  # alongside the archive, so raw_dir only needs `transcripts/` extracted
+  # ahead of time, not the audio itself.
+  tar_path: data/raw/mucs/hi-en/Hindi-English_train.tar.gz
+  member_root: train
+  raw_dir: data/raw/mucs/hi-en/train
+  out_wav_dir: data/processed/mucs/hi-en/train
+  split: train
+  out_manifest: data/manifests/mucs_hi-en_train.jsonl
+
 mucs_bn_en_test:
   adapter: mucs
   lang_pair: bn-en
@@ -23,9 +37,16 @@ mucs_bn_en_test:
   out_wav_dir: data/processed/mucs/bn-en/test
   split: test
   out_manifest: data/manifests/mucs_bn-en_test.jsonl
-  # NOTE: no local data yet. Download the Bengali-English package from
-  # https://www.openslr.org/104/ and extract it into raw_dir (Kaldi layout)
-  # before running this target.
+
+mucs_bn_en_train:
+  adapter: mucs
+  lang_pair: bn-en
+  tar_path: data/raw/mucs/bn-en/Bengali-English_train.tar.gz
+  member_root: train
+  raw_dir: data/raw/mucs/bn-en/train
+  out_wav_dir: data/processed/mucs/bn-en/train
+  split: train
+  out_manifest: data/manifests/mucs_bn-en_train.jsonl
 
 indicvoices_hi_valid:
   adapter: indicvoices

@@ -20,6 +20,8 @@ files ready for manifest building. This generalizes the logic that used to
 live in the standalone prepare_mucs.py script.
 """
 
+import io
+import tarfile
 from math import gcd
 from pathlib import Path
 
@@ -110,14 +112,8 @@ def read_utt2spk(path: Path) -> dict:
 
 # ── Segment extraction ───────────────────────────────────────────────────
 
-def extract_segment(wav_path: str, start: float, end: float, out_path: Path) -> float:
-    """
-    Slices [start, end] seconds out of wav_path, downmixes to mono, resamples
-    to 16 kHz, and writes out_path. Returns the segment duration in seconds.
-    soundfile bypasses torchaudio's TorchCodec dependency entirely.
-    """
-    wav_np, sr = sf.read(wav_path, always_2d=True)   # (samples, channels)
-
+def _slice_and_resample(wav_np, sr: int, start: float, end: float, out_path: Path) -> float:
+    """Shared core: slice [start, end], downmix to mono, resample to 16 kHz, write out_path."""
     start_frame = int(start * sr)
     end_frame   = int(end * sr)
     segment_np  = wav_np[start_frame:end_frame, :]
@@ -133,6 +129,16 @@ def extract_segment(wav_path: str, start: float, end: float, out_path: Path) -> 
 
     sf.write(str(out_path), segment, TARGET_SR)
     return len(segment) / TARGET_SR
+
+
+def extract_segment(wav_path: str, start: float, end: float, out_path: Path) -> float:
+    """
+    Slices [start, end] seconds out of wav_path, downmixes to mono, resamples
+    to 16 kHz, and writes out_path. Returns the segment duration in seconds.
+    soundfile bypasses torchaudio's TorchCodec dependency entirely.
+    """
+    wav_np, sr = sf.read(wav_path, always_2d=True)   # (samples, channels)
+    return _slice_and_resample(wav_np, sr, start, end, out_path)
 
 
 # ── Split extraction ─────────────────────────────────────────────────────
@@ -211,4 +217,104 @@ def extract_kaldi_split(raw_dir: Path, out_wav_dir: Path) -> list:
             ))
 
     print(f"  Extracted : {len(utterances)} utterances ({skipped} skipped)")
+    return utterances
+
+
+def extract_kaldi_split_from_tar(tar_path: Path, member_root: str, raw_dir: Path, out_wav_dir: Path) -> list:
+    """
+    Like extract_kaldi_split, but for a raw split too large to extract to
+    disk in full (e.g. a 90-hour train split where the extracted audio alone
+    would be ~18GB). Reads each recording's audio directly out of the .tar.gz
+    into memory, slices every segment belonging to it, writes just those
+    small 16kHz mono segments to out_wav_dir, then discards the recording —
+    the full raw recording set is never held on disk at once.
+
+    A single sequential pass through the archive is used deliberately:
+    tarfile can't efficiently random-access a gzip-compressed stream, so
+    looking up 500+ members individually would re-scan from the start each
+    time. One forward pass costs the same as a plain `tar xzf` — it's the
+    disk footprint that's different, not the read cost.
+
+    `raw_dir` must already contain `transcripts/` (extract just that small
+    subfolder ahead of time — it's tiny compared to the audio).
+    """
+    transcripts_dir = raw_dir / "transcripts"
+    out_wav_dir.mkdir(parents=True, exist_ok=True)
+
+    texts   = read_text(transcripts_dir / "text")
+    segments = read_segments(transcripts_dir / "segments")
+    utt2spk = read_utt2spk(transcripts_dir / "utt2spk")
+
+    # Raw (unresolved) recording_id -> filename, to match tar member names —
+    # read_wav_scp() resolves against a local raw_dir we're deliberately not
+    # populating with audio, so we parse wav.scp directly here instead.
+    filename_by_rec = {}
+    with open(transcripts_dir / "wav.scp", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split(maxsplit=1)
+            if len(parts) == 2:
+                filename_by_rec[parts[0]] = parts[1]
+
+    by_recording = {}
+    for utt_id, (rec_id, start, end) in segments.items():
+        by_recording.setdefault(rec_id, []).append((utt_id, start, end))
+
+    rec_id_by_filename = {fname: rec_id for rec_id, fname in filename_by_rec.items()}
+
+    print(f"  text      : {len(texts)} utterances")
+    print(f"  segments  : {len(segments)} segments across {len(by_recording)} recordings")
+
+    utterances = []
+    skipped = 0
+    seen_recordings = 0
+
+    with tarfile.open(tar_path, "r:gz") as tf:
+        for member in tf:
+            if not member.isfile():
+                continue
+            filename = member.name.rsplit("/", 1)[-1]
+            rec_id = rec_id_by_filename.get(filename)
+            if rec_id is None or rec_id not in by_recording:
+                continue
+
+            seen_recordings += 1
+            fobj = tf.extractfile(member)
+            wav_np, sr = sf.read(io.BytesIO(fobj.read()), always_2d=True)
+
+            for utt_id, start, end in by_recording[rec_id]:
+                if utt_id not in texts:
+                    skipped += 1
+                    continue
+
+                out_wav = out_wav_dir / f"{utt_id}.wav"
+                if out_wav.exists():
+                    duration = round(end - start, 3)
+                else:
+                    try:
+                        duration = round(_slice_and_resample(wav_np, sr, start, end, out_wav), 3)
+                    except Exception as e:
+                        print(f"  [skip] {utt_id} — {e}")
+                        skipped += 1
+                        continue
+
+                utterances.append(RawUtterance(
+                    utt_id=utt_id,
+                    audio_filepath=str(out_wav),
+                    text=texts[utt_id],
+                    duration=duration,
+                    speaker_id=utt2spk.get(utt_id),
+                ))
+
+            if seen_recordings % 50 == 0:
+                print(f"  ...{seen_recordings}/{len(by_recording)} recordings processed, "
+                      f"{len(utterances)} utterances so far")
+
+    missing_recordings = len(by_recording) - seen_recordings
+    if missing_recordings:
+        print(f"  [warn] {missing_recordings} recordings referenced in segments were never found in the tar")
+
+    print(f"  Extracted : {len(utterances)} utterances from {seen_recordings} recordings ({skipped} skipped)")
     return utterances

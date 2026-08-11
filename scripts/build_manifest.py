@@ -19,7 +19,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from moa_cas.pipeline.build import build_mucs_manifest, build_indicvoices_manifest
+from moa_cas.pipeline.build import build_mucs_manifest, build_mucs_manifest_from_tar, build_indicvoices_manifest
 from moa_cas.pipeline.manifest import write_jsonl
 from moa_cas.stats import summarize
 
@@ -39,7 +39,29 @@ def run(name: str):
     cfg = registry[name]
     adapter = cfg["adapter"]
 
-    if adapter == "mucs":
+    if adapter == "mucs" and "tar_path" in cfg:
+        tar_path = Path(cfg["tar_path"])
+        raw_dir = Path(cfg["raw_dir"])
+        if not tar_path.exists():
+            raise SystemExit(
+                f"\nArchive not found: {tar_path}\n"
+                f"Download the MUCS {cfg['lang_pair']} package from https://www.openslr.org/104/ there.\n"
+            )
+        if not (raw_dir / "transcripts").exists():
+            raise SystemExit(
+                f"\n{raw_dir}/transcripts not found.\n"
+                f"Extract just the transcripts/ subfolder from {tar_path.name} there first — "
+                f"the audio stays in the archive and is streamed on demand.\n"
+            )
+        rows = build_mucs_manifest_from_tar(
+            tar_path=tar_path,
+            member_root=cfg["member_root"],
+            raw_dir=raw_dir,
+            out_wav_dir=Path(cfg["out_wav_dir"]),
+            lang_pair=cfg["lang_pair"],
+            split=cfg["split"],
+        )
+    elif adapter == "mucs":
         raw_dir = Path(cfg["raw_dir"])
         if not raw_dir.exists():
             raise SystemExit(

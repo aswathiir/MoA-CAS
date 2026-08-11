@@ -15,7 +15,7 @@ Called by scripts/build_manifest.py, driven by configs/datasets.yaml.
 
 from pathlib import Path
 
-from moa_cas.preprocessing.audio import extract_kaldi_split
+from moa_cas.preprocessing.audio import extract_kaldi_split, extract_kaldi_split_from_tar
 from moa_cas.preprocessing.text import tag_utterance
 from moa_cas.pipeline.manifest import ManifestRow
 from moa_cas.datasets import indicvoices as indicvoices_adapter
@@ -26,15 +26,9 @@ MIN_DURATION_S = 0.3
 MAX_DURATION_S = 30.0
 
 
-def build_mucs_manifest(raw_dir: Path, out_wav_dir: Path, lang_pair: str, split: str) -> list:
-    """
-    Builds a ManifestRow list from a raw MUCS Kaldi split.
-    lang_pair: "hi-en" or "bn-en" — the native-language half is used as `l1`
-    for word-level language tagging.
-    """
+def _utterances_to_rows(utterances: list, lang_pair: str, split: str) -> list:
+    """Shared tag + filter + ManifestRow step for both MUCS extraction paths."""
     l1 = lang_pair.split("-")[0]
-    utterances = extract_kaldi_split(Path(raw_dir), Path(out_wav_dir))
-
     rows = []
     dropped = 0
     for utt in utterances:
@@ -64,6 +58,27 @@ def build_mucs_manifest(raw_dir: Path, out_wav_dir: Path, lang_pair: str, split:
         print(f"  Filtered  : {dropped} utterances (empty text or duration outside "
               f"[{MIN_DURATION_S}, {MAX_DURATION_S}]s)")
     return rows
+
+
+def build_mucs_manifest(raw_dir: Path, out_wav_dir: Path, lang_pair: str, split: str) -> list:
+    """
+    Builds a ManifestRow list from a raw MUCS Kaldi split already fully
+    extracted to disk. lang_pair: "hi-en" or "bn-en".
+    """
+    utterances = extract_kaldi_split(Path(raw_dir), Path(out_wav_dir))
+    return _utterances_to_rows(utterances, lang_pair, split)
+
+
+def build_mucs_manifest_from_tar(tar_path: Path, member_root: str, raw_dir: Path,
+                                  out_wav_dir: Path, lang_pair: str, split: str) -> list:
+    """
+    Builds a ManifestRow list from a raw MUCS Kaldi split too large to
+    extract to disk in full (e.g. the 90h Hindi-English train split) —
+    streams audio straight out of the downloaded .tar.gz. See
+    preprocessing/audio.py::extract_kaldi_split_from_tar for why.
+    """
+    utterances = extract_kaldi_split_from_tar(Path(tar_path), member_root, Path(raw_dir), Path(out_wav_dir))
+    return _utterances_to_rows(utterances, lang_pair, split)
 
 
 def build_indicvoices_manifest(lang: str, split: str, limit: int = None) -> list:
