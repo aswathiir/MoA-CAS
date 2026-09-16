@@ -41,6 +41,26 @@ decoder/joint (where failure #5 bites hardest), and Profile Learning only
 needs the CTC path. Only the preprocessor, encoder and auxiliary CTC
 decoder are built, directly.
 
+> ### ⚠️ Correction — earlier training results retracted
+>
+> Every training run reported in earlier revisions of this document was
+> computed against a **broken language mask**. The mask was originally
+> built by matching the language's tokenizer pieces against the shared
+> vocabulary *by string*. But 670 token strings are duplicated across
+> the 22 languages (the Devanagari-script languages share many pieces),
+> so that lookup silently resolved them to whichever language appeared
+> last — putting **213 of 256 indices (83%) on the wrong columns**.
+>
+> The loss curves still fell, because the adapter was successfully
+> fitting whatever scrambled target space it was given. This is a useful
+> cautionary result in itself: **a falling loss curve validated nothing**,
+> and the error was only caught by decoding the model and comparing WER
+> against an independent benchmark.
+>
+> The mask is now derived from the vocabulary's actual layout
+> (contiguous per-language blocks) and verified against the tokenizer at
+> load time. Results below are from the corrected implementation.
+
 ### Reconstructing the language mask
 
 The CTC decoder emits a **single 5,633-wide output shared across all 22
@@ -51,17 +71,26 @@ tokenizer knows only 256 of those tokens, and — unlike ai4bharat's ONNX
 bundle, which ships `language_masks.json` — the NeMo checkpoints include
 no mask to say which 256.
 
-It was reconstructed by string-matching the language's SentencePiece
-pieces against the shared vocabulary's token strings: **all 256 Hindi
-pieces matched exactly**. The resulting index list (256 language tokens
-+ the shared blank) gathers a 257-wide local view out of the decoder
-output, in which the tokenizer's own IDs line up directly as CTC targets.
+The shared vocabulary turns out to be laid out as **contiguous
+per-language blocks**, in the order the languages appear in
+`tokenizer.langs`: 22 languages × 256 tokens = 5,632 exactly. Hindi is
+language #6, so its block is indices `[1536:1792]` — and that block
+equals its tokenizer's pieces exactly, in order. The mask is that block
+plus the shared blank index, giving a 257-wide local view in which the
+tokenizer's own IDs line up directly as CTC targets.
 
-One trap worth recording: this must use the compiled `.tokenizer.model`
-file via the `sentencepiece` library. The auxiliary `vocab.txt` bundled
-alongside it uses a WordPiece-style `##` display convention that will not
-cross-reference against the SentencePiece `▁`-style master vocabulary at
-all.
+Two traps worth recording:
+
+- **Do not match by string.** 670 token strings are duplicated across
+  languages, so a string→index lookup resolves them to the wrong
+  language's column (this was the original bug — see the correction
+  notice above). The block layout is the correct derivation, and the
+  implementation now asserts the derived block matches the tokenizer
+  exactly, failing loudly if the assumption ever breaks.
+- Use the compiled `.tokenizer.model` file via the `sentencepiece`
+  library. The auxiliary `vocab.txt` bundled alongside it uses a
+  WordPiece-style `##` display convention that will not cross-reference
+  against the SentencePiece `▁`-style master vocabulary at all.
 
 ---
 
@@ -91,35 +120,96 @@ freezing is real, not assumed. (At initialisation the down-projection
 sees zero gradient because the up-projection is zero-initialised; this is
 the expected behaviour of an identity-initialised adapter, not a fault.)
 
+### Decode-path validation (the correctness gate)
+
+Before any training result can mean anything, the CTC decode path and
+the reconstructed language mask have to be shown correct. The test:
+decode the NeMo model with **no adapter at all** over the same 100
+utterances the ONNX model was independently benchmarked on, and compare.
+
+| Configuration | WER on MUCS Hindi-English test (n=100) |
+|---|---|
+| ONNX IndicConformer (independent benchmark) | 57.14% |
+| NeMo backbone, broken string-matched mask | **88.56%** ❌ |
+| NeMo backbone, corrected block mask | **55.37%** ✅ |
+
+The corrected path lands within 1.8 points of an independently measured
+benchmark — expected for two different checkpoint variants of the same
+model family — and produces fluent Hindi that tracks the reference, with
+English transliterated into Devanagari (`impress` → `इम्प्रेस`,
+`document` → `डॉक्यूमेंट`). The broken mask produced sparse near-gibberish
+while *still yielding a smoothly falling training loss*.
+
+**This gate is the single most valuable experiment run on this project so
+far.** It invalidated several hours of apparently successful training and
+cost about a minute to run.
+
 ### Training runs
 
-| Run | Duration | Steps | Epochs | Throughput | Non-finite losses | Outcome |
-|---|---|---|---|---|---|---|
-| First 5-hour attempt | 5 h | 39,236 | 6 | 2.18 utt/s | Corrupted at step 289 | **Failed** — see below |
-| 1-hour validation | 1 h | 6,707 | 1 | 1.86 utt/s | 0 | Loss trend 109 → 57 |
-| Full 5-hour run | 5 h | 46,394 | 7 | 2.58 utt/s | 0 | Loss 68.07 → 43.65 |
-| 1-hour epoch run (current code) | 1 h | 5,394 | 6 | 1.50 utt/s | 0 | Loss 97.89 → 38.38 |
+Earlier runs (a first 5-hour attempt destroyed by NaN corruption, a
+1-hour validation, a clean 5-hour run, and a 1-hour six-epoch run) are
+**retracted** — all used the broken mask, and their loss curves describe
+convergence toward a scrambled target. They are not reproducible from
+the repository in any case, as they predate the current code.
 
-The final row is the important one for reproducibility: the three earlier
-runs used an exploratory script that no longer exists, so their results
-cannot be re-derived from the repository. The 1-hour epoch run was
-executed against **the committed code** (`scripts/train_profile_adapter.py`)
-over a fixed 1,000-utterance subset, completing five full epochs plus a
-partial sixth:
+Throughput measurements from those runs remain valid, since throughput
+does not depend on the mask being correct: **1.5–3.6 utterances/sec** on
+CPU at batch size 1, centring around 2.5 utt/s.
 
-| Epoch | 1 | 2 | 3 | 4 | 5 | 6 (partial) |
-|---|---|---|---|---|---|---|
-| Mean loss | 97.89 | 58.72 | 51.73 | 46.58 | 43.91 | 38.38 |
-| Median loss | 72.73 | 23.65 | 15.44 | 13.08 | 10.24 | 10.87 |
+The run that produced the result below used the corrected mask:
+**1 hour CPU, 3,960 steps, 3 epochs over 2,000 pure-Hindi training
+utterances**, 111 skipped, zero non-finite losses, median loss 12.36 →
+7.14 across epochs. The adapter was saved and evaluated.
 
-A **60.8% reduction in mean loss** and **85% in median** across the run,
-with zero non-finite losses and 152 utterances (2.7%) skipped by the
-safety guard. The median falling far faster than the mean indicates the
-adapter is fitting the bulk of the data well while a minority of hard
-utterances continue to dominate the average — consistent with the
-segmentation artifacts described in
-`01_BASELINE_AND_PROBLEM_ANALYSIS.md`, where a subset of utterances
-contain audio whose words are absent from the reference.
+### Headline result — measured WER improvement
+
+Trained on the MUCS Hindi-English **train** split, evaluated on the
+**test** split. The two are genuinely held out from each other: 520 vs
+30 speakers with **zero overlap**, verified.
+
+| Evaluation set | Baseline | With adapter | Change |
+|---|---|---|---|
+| Pure-Hindi held-out (n=100) — **WER** | 67.18% | **51.81%** | **−15.37 pts (−22.9% relative)** |
+| Pure-Hindi held-out — CER | 56.05% | **40.57%** | −15.48 pts |
+| Pure-Hindi held-out — median WER | 79.29% | **39.57%** | −39.72 pts |
+| Full mixed test set (n=100) — WER | 55.37% | **45.44%** | −9.93 pts (−17.9% relative) |
+
+**Paired statistics** on the identical 100 held-out utterances:
+53 improved, 25 worse, 22 unchanged; mean change −0.1537 with a 95%
+confidence interval of **[−0.216, −0.092]**; paired *t* = −4.84. The
+improvement is statistically significant, not noise.
+
+### Why it improves — the mechanism
+
+The frozen backbone systematically **under-emits** on this domain: it
+produces only **75%** as many words as the reference contains, truncating
+longer utterances. The adapter raises that ratio to **86%**, recovering
+words the baseline dropped. The gain holds across every duration bucket
+(−0.10 WER for 1–5 s, −0.20 for 5–10 s, −0.17 for >10 s).
+
+Illustrative (baseline → adapter, same utterance):
+
+```
+REF : अगर स्पेशल फ्लेग का चुनाव न हो तो देखते है आगे क्या होता है चलो हम यहाँ आते है
+BASE: तो स् च चमते हैं                                              (WER 0.89)
+ADAP: अगर स्पेशल फ्लैग का चुनाव न हो तो देखते हैं क्या होता है चलो हम यहाँ आते हैं  (WER 0.05)
+```
+
+Note the adapter also improves the **mixed** code-switched set (−9.93
+pts) despite being trained only on monolingual Hindi. That is consistent
+with the finding in `01_BASELINE_AND_PROBLEM_ANALYSIS.md` that most of
+the degradation on this corpus is **domain shift rather than
+code-switching** — the adapter is primarily closing the domain gap, which
+is exactly what a monolingual in-domain training signal should teach it.
+
+### How to read this result
+
+It is a genuine, held-out, statistically significant improvement from one
+hour of CPU training with 1.12M trainable parameters (0.98% of the
+backbone). It is **not** yet evidence that MoA-CAS solves code-switching:
+the adapter was trained on monolingual data and is mostly performing
+domain adaptation. The code-switching claim requires the English expert
+and the router, neither of which exists.
 
 Per-epoch mean loss on the clean 5-hour run, over the full 7,083-utterance
 pure-Hindi pool:
@@ -208,24 +298,20 @@ feasibility is established and effectiveness is entirely unmeasured.
 
 Ordered by how much they block progress.
 
-1. **The training script never saves the adapter weights.** There is no
-   `torch.save` anywhere in it. Every run — including the successful
-   5-hour one — trains adapters and discards them entirely on exit; only
-   the loss log persists. As a *measurement instrument* for throughput
-   and feasibility this was fine, and that is what the pilot was for, but
-   **no trained adapter currently exists**. Checkpointing must be added
-   before any run can produce a usable artifact. This is the single most
-   important fix.
-2. **No WER evaluation of a trained adapter.** Falling CTC loss is not
-   evidence of better transcription. Until an adapter is trained, saved,
-   and benchmarked with the same WER harness used in
-   `01_BASELINE_AND_PROBLEM_ANALYSIS.md`, the project has no evidence
-   that Profile Learning improves anything. This is the decisive
-   experiment and it has not been run.
-3. **No held-out validation set.** Training loss on the training data
-   cannot distinguish learning from memorisation. With 520 speakers
-   available, a speaker-disjoint dev split is straightforward — the
-   helper already exists (`pipeline/splits.py`) and is unused.
+1. **Scale the evaluation.** The result rests on n=100 per condition.
+   The full Hindi-English test set has 3,132 utterances; running all of
+   them would tighten the confidence interval substantially. Bengali is
+   entirely unevaluated.
+2. **Train properly on GPU.** The current adapter had one hour of CPU
+   time, three epochs, 2,000 utterances. The full pure-Hindi pool is
+   7,083 utterances and the model was still improving when the clock ran
+   out — there is clear headroom left unexploited.
+3. **No dev split for model selection.** Training ran for a fixed wall
+   clock with no early stopping and no validation-based checkpoint
+   selection. The helper exists (`pipeline/splits.py`) and is unused; the
+   current result uses the official test split directly, which is fine
+   for a single measurement but invites overfitting the moment
+   hyperparameters start being tuned against it.
 4. **Bengali has never been run.** HF access is granted and the code path
    is language-parameterised, but `--lang bn` has not been executed once.
    `Eia` is supposed to cover both languages; currently it covers one.
