@@ -60,12 +60,27 @@ languages (5632 tokens + 1 blank, appended as the last class). A single
 language's own tokenizer only covers a subset of it, and no mask file
 ships with the checkpoint to say which subset (ai4bharat's ONNX bundle
 has the equivalent, `language_masks.json` — the NeMo checkpoints don't).
-`moa_cas/adapters/language_mask.py` reconstructs it by string-matching
-the language's own SentencePiece pieces against the shared vocabulary's
-token strings — using the compiled `.tokenizer.model` file directly
-(via the `sentencepiece` library), not the auxiliary `vocab.txt` export
-bundled alongside it, which can use a different display convention
-(WordPiece-style `##` prefixes) that won't match at all.
+`moa_cas/adapters/language_mask.py` reconstructs it from the
+vocabulary's actual layout: **contiguous per-language blocks**, in the
+order the languages appear in `tokenizer.langs` (22 × 256 = 5632
+exactly). Hindi is language #6, so its block is `[1536:1792]`, and that
+block equals its tokenizer's pieces exactly, in order. `build()` asserts
+that match and raises rather than proceeding if it ever fails.
+
+**Do not reconstruct this by string-matching pieces against the
+vocabulary.** That was the original implementation and it was wrong: 670
+token strings are duplicated across the 22 languages (the
+Devanagari-script languages share many pieces), so the lookup resolved
+them to whichever language appeared last, putting **213 of 256 indices
+(83%) on the wrong columns**. Training loss fell smoothly throughout —
+the adapter simply learned the scrambled target space — and the error
+surfaced only when the backbone was decoded and its WER compared against
+an independent benchmark (88.56% against an expected 57.14%).
+
+Whichever derivation is used, take the tokenizer from the compiled
+`.tokenizer.model` file via the `sentencepiece` library, not the
+auxiliary `vocab.txt` bundled alongside it, which uses a WordPiece-style
+`##` display convention that won't cross-reference at all.
 
 ## A wasted 5 hours, and the fix
 

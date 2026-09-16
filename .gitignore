@@ -11,3 +11,4 @@ poetry.lock
 data/raw/
 data/processed/
 
+checkpoints/
