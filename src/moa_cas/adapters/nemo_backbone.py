@@ -24,25 +24,30 @@ CACHE_ROOT = Path.home() / ".cache" / "moa_cas" / "nemo_checkpoints"
 
 
 def _download_and_extract(lang: str) -> Path:
+    extract_dir = CACHE_ROOT / lang
+    # Skip the hub round-trip entirely once extracted — snapshot_download
+    # re-validates the cached repo on every call, which costs minutes.
+    if (extract_dir / "model_config.yaml").exists():
+        return extract_dir
+
     repo_id = f"ai4bharat/indicconformer_stt_{lang}_hybrid_ctc_rnnt_large"
     snapshot_dir = Path(snapshot_download(repo_id=repo_id))
     nemo_files = list(snapshot_dir.glob("*.nemo"))
     if not nemo_files:
         raise FileNotFoundError(f"No .nemo file found in {snapshot_dir}")
 
-    extract_dir = CACHE_ROOT / lang
-    if not (extract_dir / "model_config.yaml").exists():
-        extract_dir.mkdir(parents=True, exist_ok=True)
-        with tarfile.open(nemo_files[0]) as tf:
-            tf.extractall(extract_dir)
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(nemo_files[0]) as tf:
+        tf.extractall(extract_dir)
     return extract_dir
 
 
-def load_backbone(lang: str, extract_dir: Path = None):
+def load_backbone(lang: str, extract_dir: Path = None, device=None):
     """
     Returns (preprocessor, encoder, ctc_decoder, cfg_dict), all frozen
-    (requires_grad=False, eval mode) — insert trainable adapters on top
-    via moa_cas.adapters.bottleneck.insert_into_encoder.
+    (requires_grad=False, eval mode) and moved to `device` — insert
+    trainable adapters on top via
+    moa_cas.adapters.bottleneck.insert_into_encoder.
 
     cfg_dict["tokenizer"] is rewritten to a flat, absolute-path form (see
     below) — read it back to build the language mask
@@ -70,6 +75,9 @@ def load_backbone(lang: str, extract_dir: Path = None):
         "model_path": _resolve(lang_tok["model_path"]),
         "vocab_path": _resolve(lang_tok["vocab_path"]),
         "spe_tokenizer_vocab": _resolve(lang_tok["spe_tokenizer_vocab"]),
+        # Preserved because language_mask.build needs the language ordering
+        # to locate this language's block in the shared CTC vocabulary.
+        "langs": {name: {} for name in cfg_dict["tokenizer"]["langs"]},
     }
 
     # These reference ai4bharat's internal training-cluster manifest
@@ -117,5 +125,7 @@ def load_backbone(lang: str, extract_dir: Path = None):
         module.eval()
         for p in module.parameters():
             p.requires_grad = False
+        if device is not None:
+            module.to(device)
 
     return preprocessor, encoder, ctc_decoder, cfg_dict
