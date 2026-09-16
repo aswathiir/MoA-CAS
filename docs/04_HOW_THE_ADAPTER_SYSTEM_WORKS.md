@@ -242,6 +242,82 @@ Measure WER.**
 
 ---
 
+### The vocabulary contains no English whatsoever
+
+This deserves its own statement, because it constrains what the whole
+architecture can achieve.
+
+All 22 language blocks in the shared vocabulary are **Indian languages**:
+`as, bn, brx, doi, kok, gu, hi, kn, ks, mai, ml, mr, mni, ne, or, pa, sa,
+sat, sd, ta, te, ur`. English is not among them. Searching all 5,632
+tokens for any containing a Latin letter returns exactly one entry —
+`<unk>` — repeated once per language block.
+
+**This model cannot write the word `document`. It can only write
+`डॉक्यूमेंट`.** There is no sequence of tokens available to it that spells
+English.
+
+The consequence for evaluation is severe. **24.6% of reference words in
+the MUCS Hindi-English test set are Latin-script English.** Under
+exact-match WER, roughly a quarter of the test set is unscoreable
+regardless of how well the audio was understood. That is a **hard WER
+floor of about 25%** on this corpus with this backbone, unreachable by
+any amount of adapter training.
+
+The consequence for the architecture is more fundamental. Adapters sit
+inside the **encoder** and change how the model *hears*. The constraint
+here is in the **decoder**, which governs what the model can *write*. A
+perfect English expert adapter would still be unable to emit a single
+English character. **MoA-CAS as originally specified cannot solve
+code-switching on this backbone** — not because the design is wrong, but
+because this particular model has no English in its output space.
+
+Three ways forward, none of them free:
+
+1. **Extend the output vocabulary** with English tokens and train a new
+   CTC head alongside the adapters. Retains IndicConformer's Indic
+   acoustic strength; gives up the strictly-frozen decoder, though
+   adapters plus a small new head remains parameter-efficient.
+2. **Change backbone** to one that already models English — Whisper or
+   MMS. This is what Biswas et al. (2025) did for the same problem.
+   Trades some Indic specialisation for genuine bilingual output.
+3. **Change the metric** to score transliteration-aware, treating
+   `document` → `डॉक्यूमेंट` as correct. This measures recognition rather
+   than spelling. It does not fix the model, but it stops conflating two
+   very different failures (see below).
+
+### How much of the error is spelling rather than hearing
+
+Romanising both reference and hypothesis into a shared phonetic space and
+rescoring separates "did not understand the audio" from "understood, cannot
+spell it in Latin" (`scripts/score_transliteration_aware.py`):
+
+| Test set | Standard CER | Transliteration-aware CER |
+|---|---|---|
+| Mixed (24.6% English), baseline | 54.40% | **33.88%** |
+| Mixed, with adapter | 50.37% | **29.59%** |
+| Pure Hindi (0% English), baseline | 56.05% | 55.03% |
+| Pure Hindi, with adapter | 40.57% | 40.10% |
+
+**About 20 points of measured error on code-switched speech is script
+mismatch, not misrecognition.** Phonetic word recall — the share of
+reference words recovered allowing spelling drift — is **66.9%** on the
+mixed set, against a standard WER implying roughly half the words are
+wrong. The acoustic model is substantially stronger than the headline
+number suggests.
+
+The pure-Hindi rows are the control that makes this credible: with no
+English present there is no script mismatch to forgive, and the metric
+correctly finds almost nothing (56.05% → 55.03%). It fires only where
+English actually occurs.
+
+The normaliser is approximate by construction — it collapses aspirates,
+vowel length, retroflex/dental distinctions and word-final schwa — so it
+forgives some genuine errors. Treat these figures as an upper bound on
+"recognised correctly".
+
+---
+
 ## Part 5 — Why CTC, and how the loss works
 
 The encoder turns roughly one second of audio into 25 output frames. The

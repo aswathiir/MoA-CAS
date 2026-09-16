@@ -202,14 +202,56 @@ the degradation on this corpus is **domain shift rather than
 code-switching** — the adapter is primarily closing the domain gap, which
 is exactly what a monolingual in-domain training signal should teach it.
 
+### Scope of the result — where the gain actually comes from
+
+Splitting the held-out test words by whether the adapter encountered that
+word type during training:
+
+| Word type | Baseline recall | With adapter | Change | n | Significance |
+|---|---|---|---|---|---|
+| Seen in training | 56.8% | 69.0% | **+12.2 pts** | 1,339 | z = +6.5, significant |
+| Never seen | 41.2% | 47.3% | +6.1 pts | 182 | z = +1.2, **not significant** |
+
+The improvement on familiar vocabulary is **twice** that on unfamiliar
+vocabulary, and the unfamiliar gain cannot be distinguished from noise at
+this sample size. A substantial share of the headline −15.37 points is
+the adapter becoming fluent in *this corpus's particular vocabulary* —
+the Devanagari spellings of `presentation`, `slide`, `format`,
+`dialog box` that saturate these transcripts.
+
+That vocabulary-specific component would **not** transfer to a different
+code-switched corpus. On new material with different vocabulary, the
+expected gain is closer to the unseen-word figure than the headline one.
+
+Two qualifications in both directions. The unseen improvement is +6.1
+points rather than zero, so some genuinely transferable adaptation
+plausibly occurred — it simply cannot be proven with 182 words. Against
+that, the "seen" bucket includes ordinary Hindi function words that would
+appear in any Hindi text, so the truly corpus-specific concentration may
+be higher than this split shows.
+
+**The defensible claim is therefore narrower than the headline:** adapters
+on a frozen Indic backbone measurably improve *in-domain* ASR, with gains
+concentrated in vocabulary observed during training. Not "adapters improve
+Hindi ASR" in general, and not "adapters improve code-switched ASR".
+
 ### How to read this result
 
 It is a genuine, held-out, statistically significant improvement from one
 hour of CPU training with 1.12M trainable parameters (0.98% of the
 backbone). It is **not** yet evidence that MoA-CAS solves code-switching:
 the adapter was trained on monolingual data and is mostly performing
-domain adaptation. The code-switching claim requires the English expert
-and the router, neither of which exists.
+domain adaptation, concentrated in observed vocabulary.
+
+There is also a hard ceiling that no adapter can lift. The backbone's
+output vocabulary contains **no English tokens at all** — the only
+Latin-containing entry across all 5,632 tokens is `<unk>` — so the 24.6%
+of reference words written in Latin script can never be produced
+correctly. That is a **~25% WER floor** on this corpus, and it means the
+code-switching objective cannot be met by adapters alone: they change what
+the encoder hears, while the constraint lives in what the decoder can
+write. See `04_HOW_THE_ADAPTER_SYSTEM_WORKS.md` for the analysis and the
+three available routes around it.
 
 Per-epoch mean loss on the clean 5-hour run, over the full 7,083-utterance
 pure-Hindi pool:
