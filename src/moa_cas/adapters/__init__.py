@@ -8,4 +8,5 @@ this package needs it). Import what you need directly:
     from moa_cas.adapters.bottleneck import BottleneckAdapter, insert_into_encoder
     from moa_cas.adapters.nemo_backbone import load_backbone
     from moa_cas.adapters.language_mask import build as build_language_mask
+    from moa_cas.adapters.router import MixtureOfAdapters, attach, build_experts
 """
