@@ -17,6 +17,17 @@ soundfile    = ">=0.12.1"
 scipy        = ">=1.11.0"
 pyyaml       = ">=6.0"
 
+# Only needed for moa_cas.adapters (Profile Learning / scripts/train_profile_adapter.py).
+# nemo_toolkit is a heavy, version-sensitive dependency — kept optional so the
+# preprocessing pipeline and benchmark don't require it. Install with:
+#   pip install -e ".[adapters]"
+nemo_toolkit  = { version = ">=2.5.0", extras = ["asr"], optional = true }
+sentencepiece = { version = ">=0.1.99", optional = true }
+indic-transliteration = { version = ">=2.3.0", optional = true }
+
+[tool.poetry.extras]
+adapters = ["nemo_toolkit", "sentencepiece", "indic-transliteration"]
+
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.0.0"
 
