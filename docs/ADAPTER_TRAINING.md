@@ -121,5 +121,5 @@ access granted to the target language's repo (see bug #1 above).
   full Hindi+Bengali training run (~86,739 utterances, ~10 epochs) is
   roughly 93.5 hours on CPU, or an estimated 3-6 hours on a single
   modest GPU. Not yet run on an actual GPU.
-- Stage 2 (the router) — nothing here touches it.
+- Stage 2 (the router): now implemented separately; see `05_ROUTER.md`.
 - `Een` (English) — no corpus, no backbone decision made yet.

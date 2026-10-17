@@ -18,7 +18,7 @@ Code: `src/moa_cas/adapters/router.py`, `scripts/train_router.py`,
 | MoA-CAS Zeroth Review deck, slides 8–10 | Frozen backbone. Frame-level router producing `w_t`. Specialists fused as `Σ w_t · A_k(h_t)`. Stage 2 trains **only** the router; adapters are locked. Loss = CTC + load balancing. |
 | Kulkarni et al. 2023, *Adapting the Adapters for Code-Switching in Multilingual ASR* (arXiv:2310.07423) | Two language adapters combined at **every** transformer block by a per-frame gate: `O = (1 − g_t)·A₁ + g_t·A₂`, with backbone frozen and only the switching network trained on a small amount of code-switched data. Our router is the K-expert softmax generalisation; `--routing hard` reproduces their thresholded gate. |
 | Zhao et al. 2024, *CAMEL* (arXiv:2412.12760) | Language-specific experts after each layer whose representations are fused, plus a language-diarization signal. Motivates looking at whether routing tracks language (the `corr(en_fraction)` diagnostic) — not implemented as an extra loss. |
-| Fedus et al. 2021, *Switch Transformers* | The load-balancing loss `K · Σ_k f_k · P_k`. |
+| Fedus et al. 2022 (JMLR), *Switch Transformers* | The load-balancing loss `K · Σ_k f_k · P_k`. |
 | Winata et al. 2020 | The "don't forget monolingual" constraint: here met structurally, because the base model is never changed and an `identity` expert keeps it reachable per frame. |
 
 ## 2. Architecture
@@ -37,7 +37,7 @@ out_t = h_t + Σ_k w_t,k · (A_k(h_t) − h_t)        ≡ Σ_k w_t,k · A_k(h_t)
 - The last layer is **zero-initialised**, so an untrained router gives exactly uniform weights. This is the same "start from a known state" principle as the zero-init adapters.
 - The router is attached with a forward hook that reads NeMo's `pad_mask`. Padded frames never enter the load-balancing statistics.
 
-**Trainable parameters:** 1.19 M (routers only) on top of ~1.1 M per Stage 1 adapter. Together that is about 2% of the backbone, in line with the deck's `< 2%` target.
+**Trainable parameters:** 1,190,306 (routers only), on top of 1,123,904 for the Hindi adapter. Together that is 1.96% of the 118.0 M-parameter NeMo backbone (encoder + CTC head), just inside the deck's `< 2%` target.
 
 **Routing modes:**
 - `soft` (training default): full weighted mix.
@@ -111,7 +111,7 @@ Run each on both the mixed and pure-Hindi subsets. The pure-Hindi run is the dec
   - hard routing picks one expert per frame;
   - the Stage 1 checkpoint loads, and a backbone mismatch is rejected.
 
-  Full suite: 22/22 pass.
+  Full suite: 45/45 pass.
 - **End-to-end smoke run** on the real Hindi NeMo backbone, the real `hi_adapter.pt`, and MUCS audio: 150 s on CPU, 60 code-mixed utterances, 89 steps, no NaNs. Evaluation, routing shares, correlation, and the per-frame trace all produce output.
 
   The smoke numbers (20 test utterances: uniform WER 0.424 vs smoke-trained 0.451) are **not a result**. That is 2.5 minutes of training, and n = 20 is far too small to read either way.
