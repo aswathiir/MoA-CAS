@@ -185,6 +185,7 @@ docs/                the write-ups below
 
 | # | Document | What it answers |
 |---|---|---|
+| 0 | **[00_COMPLETE_GUIDE](docs/00_COMPLETE_GUIDE.md)** | **Start here.** The whole project in plain language: data, architecture, training settings, methods, results, glossary |
 | 1 | [01_BASELINE_AND_PROBLEM_ANALYSIS](docs/01_BASELINE_AND_PROBLEM_ANALYSIS.md) | How bad is the problem, and what actually causes it? |
 | 2 | [02_DATA_PREPROCESSING](docs/02_DATA_PREPROCESSING.md) | What data we use and how it was prepared |
 | 3 | [03_PROFILE_LEARNING_ADAPTERS](docs/03_PROFILE_LEARNING_ADAPTERS.md) | Stage 1 results |
