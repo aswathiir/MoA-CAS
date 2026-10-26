@@ -111,10 +111,27 @@ Run each on both the mixed and pure-Hindi subsets. The pure-Hindi run is the dec
   - hard routing picks one expert per frame;
   - the Stage 1 checkpoint loads, and a backbone mismatch is rejected.
 
-  Full suite: 45/45 pass.
+  Full suite: 49/49 pass.
 - **End-to-end smoke run** on the real Hindi NeMo backbone, the real `hi_adapter.pt`, and MUCS audio: 150 s on CPU, 60 code-mixed utterances, 89 steps, no NaNs. Evaluation, routing shares, correlation, and the per-frame trace all produce output.
 
   The smoke numbers (20 test utterances: uniform WER 0.424 vs smoke-trained 0.451) are **not a result**. That is 2.5 minutes of training, and n = 20 is far too small to read either way.
+
+## 5b. First full training run (router_hi_id)
+
+Run settings: 38,531 steps, 5 epochs, `hi` + `identity`, α = 0.01, `--english-targets drop`.
+
+Evaluated on the same 100 utterances as every other system:
+
+| Set | Base | Adapter alone | Router |
+|---|---|---|---|
+| Mixed | 55.37% | **46.60%** | 50.50% |
+| Pure Hindi | 67.18% | **52.84%** | 58.25% |
+
+- The router significantly beats base on both sets (t = −2.30 / −3.69).
+- It is significantly *worse* than the adapter alone (t = +2.75 / +3.36).
+- Routing is close to a constant ~46% blend, and it doesn't track English density (r = 0.02).
+
+See THESIS_REFERENCE R16–R18 for causes to test next. Try it live with `python scripts/demo_server.py`.
 
 ## 6. What is still missing
 

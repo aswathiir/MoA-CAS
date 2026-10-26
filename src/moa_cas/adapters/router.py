@@ -132,6 +132,11 @@ class MixtureOfAdapters(nn.Module):
             for _ in range(n_layers)
         )
         self.routing = routing
+        # When set, bypasses the routers and uses these K weights on every
+        # frame: [0, 1] over (adapter, identity) is the untouched backbone,
+        # [1, 0] the adapter alone. Lets one loaded model serve every
+        # comparison condition (scripts/demo_server.py).
+        self.fixed_weights: Optional[Sequence[float]] = None
         self._probs: List[Optional[torch.Tensor]] = [None] * n_layers
         self._valid: List[Optional[torch.Tensor]] = [None] * n_layers
 
@@ -154,7 +159,10 @@ class MixtureOfAdapters(nn.Module):
         return self
 
     def mix(self, layer: int, h: torch.Tensor, pad_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
-        probs = self.routers[layer](h, pad_mask)
+        if self.fixed_weights is not None:
+            probs = h.new_tensor(self.fixed_weights).expand(*h.shape[:-1], self.n_experts)
+        else:
+            probs = self.routers[layer](h, pad_mask)
         self._probs[layer] = probs
         self._valid[layer] = None if pad_mask is None else ~pad_mask
 

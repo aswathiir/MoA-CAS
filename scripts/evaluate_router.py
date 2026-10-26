@@ -103,6 +103,8 @@ def run(args):
     rows = [json.loads(line) for line in open(args.manifest, encoding="utf-8")]
     if args.code_mixed_only:
         rows = [r for r in rows if r["is_code_mixed"]]
+    if args.pure_l1_only:
+        rows = [r for r in rows if r["n_words_en"] == 0]
     rows = rows[args.skip:]
     rows = rows[:args.limit] if args.limit else rows
 
@@ -175,6 +177,7 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=100)
     parser.add_argument("--skip", type=int, default=0)
     parser.add_argument("--code-mixed-only", action="store_true")
+    parser.add_argument("--pure-l1-only", action="store_true", help="Keep only utterances with zero English words")
     parser.add_argument("--trace", default=None, help="utt_id to print a frame-level routing trace for")
     parser.add_argument("--out-csv", default=None)
     parser.add_argument("--device", default="auto", help="auto | cpu | cuda")

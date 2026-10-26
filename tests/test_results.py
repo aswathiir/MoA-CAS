@@ -34,6 +34,8 @@ def mean_pct(name, col="wer"):
     ("adapter_eval/eval_adapt_mixed.csv", 45.44, 50.37),
     ("adapter_eval/eval_adapt_pure_ckpt0917.csv", 52.84, 41.58),    # adapter (checkpoint on disk)
     ("adapter_eval/eval_adapt_mixed_ckpt0917.csv", 46.60, 49.01),
+    ("router_eval/router_hi_id_mixed.csv", 50.50, 51.07),           # trained router
+    ("router_eval/router_hi_id_pure.csv", 58.25, 47.88),
 ])
 def test_headline_wer_cer(name, wer, cer):
     assert len(rows(name)) == 100
@@ -56,6 +58,15 @@ def test_adapter_improvement_is_paired_and_significant():
     assert paired("adapter_eval/eval_adapt_pure_ckpt0917.csv", "adapter_eval/eval_base_pure.csv") == \
         {"better": 55, "worse": 23, "same": 22, "t": -4.81}
     assert paired("adapter_eval/eval_adapt_mixed_ckpt0917.csv", "adapter_eval/nemo_baseline_fixed.csv")["t"] == -3.56
+
+
+def test_router_beats_base_but_not_adapter_alone():
+    mixed = "router_eval/router_hi_id_mixed.csv"
+    assert paired(mixed, "adapter_eval/nemo_baseline_fixed.csv")["t"] == -2.30
+    assert paired(mixed, "adapter_eval/eval_adapt_mixed_ckpt0917.csv")["t"] == 2.75
+    pure = "router_eval/router_hi_id_pure.csv"
+    assert paired(pure, "adapter_eval/eval_base_pure.csv")["t"] == -3.69
+    assert paired(pure, "adapter_eval/eval_adapt_pure_ckpt0917.csv")["t"] == 3.36
 
 
 def test_train_and_test_speakers_are_disjoint():

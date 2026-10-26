@@ -133,3 +133,20 @@ def test_rejects_single_expert_and_layer_mismatch():
     moa = MixtureOfAdapters([identity_expert(LAYERS + 1), identity_expert(LAYERS + 1)], DIM)
     with pytest.raises(ValueError, match="layers"):
         attach(FakeEncoder(), moa)
+
+
+def test_fixed_weights_select_backbone_or_single_expert():
+    encoder = FakeEncoder()
+    a = trained_expert(0)
+    moa = attach(encoder, MixtureOfAdapters([a, identity_expert(LAYERS)], DIM))
+    x = torch.randn(1, 3, DIM)
+
+    moa.fixed_weights = [0.0, 1.0]
+    assert torch.allclose(encoder(x), x + LAYERS, atol=1e-6)  # untouched backbone
+
+    moa.fixed_weights = [1.0, 0.0]
+    expected = x
+    for layer in range(LAYERS):
+        expected = a[layer](expected + 1)
+    assert torch.allclose(encoder(x), expected, atol=1e-5)  # adapter alone
+    assert torch.allclose(moa.routing_weights()[0, :, 0], torch.ones(3))

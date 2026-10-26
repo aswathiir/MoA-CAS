@@ -16,7 +16,7 @@ Run every check with:
 python -m pytest -q tests
 ```
 
-Status on 2026-10-17: 45 passed, 0 skipped.
+Status on 2026-10-26: 49 passed, 0 skipped.
 
 ---
 
@@ -86,7 +86,20 @@ All evaluations use the **first 100 utterances** (in manifest order) of the MUCS
 | R13 | The router implements the deck's `Σ w_t · A_k(h_t)` at every layer and every frame. It generalises Kulkarni et al.'s two-adapter gate. | Mixture output equals the hand-computed weighted sum | ✅ `test_router.py` |
 | R14 | Load-balancing loss behaves correctly | 1.0 when balanced, K when collapsed, ignores padding | ✅ |
 | R15 | Runs end to end on the real model and audio | 150 s CPU smoke run: 89 steps, no NaN; evaluation and frame trace produced | ✔️ |
-| R16 | **The router improves WER** | **Not measured.** No full training run yet. The smoke-run numbers (n = 20) are not a result. | ⛔ |
+| R16 | Router (`checkpoints/router_hi_id.pt`: 38,531 steps, 5 epochs, experts hi + identity), mixed | WER **50.50%**, CER 51.07%. vs base −4.87 points (27 better / 23 worse, t = −2.30); vs adapter alone **+3.91** (13 / 29, t = +2.75) | `results/router_eval/router_hi_id_mixed.csv` | ✅ |
+| R17 | Router, pure Hindi (degradation monitoring) | WER **58.25%**, CER 47.88%. vs base −8.94 (t = −3.69); vs adapter alone **+5.40** (t = +3.36) | `results/router_eval/router_hi_id_pure.csv` | ✅ |
+| R18 | Does routing follow language? | Mean adapter share 0.47 (mixed) / 0.46 (pure). Correlation with English-word fraction across utterances: r = +0.02, i.e. none. | R16 CSV | ✔️ |
+
+**What can be claimed from R16–R18:** the router is trained end to end with only its own 1.19 M parameters, and it significantly beats the frozen base model on both sets.
+
+**What can't be claimed:** that it beats the adapter alone, or that it routes by language. It learned a nearly constant ~46% blend.
+
+**Plausible causes, not yet tested:**
+- The second expert is the unadapted backbone, not an English expert.
+- With `--english-targets drop`, English frames are trained toward blank.
+- The router was trained outside this machine (it arrived as an unzipped `router_hi_id/` folder), so there is no record of which `hi_adapter.pt` it was trained against. If that adapter differs from the one on disk, the router is mismatched to its expert.
+
+Record the adapter hash with every router run.
 
 ## 4. Evaluation protocol (state this in the thesis method chapter)
 
@@ -103,6 +116,7 @@ All evaluations use the **first 100 utterances** (in manifest order) of the MUCS
 | C1 | `checkpoints/hi_adapter.pt` was **overwritten on 17 Sep** by a shorter run: 1,933 steps, 1 epoch, 1,933 utterances. The 16 Sep checkpoint behind the 51.81% figure (doc 03: 3,960 steps, 3 epochs) is gone. `checkpoints/` is git-ignored, so nothing recorded the change. | R9 can't be reproduced; R7/R8 can. | Report **R7/R8** as the main result. Mention R9 only as an earlier run. Current checkpoint SHA-256: `0387975f62995508b7f8561e61b05d04d9d86ba1bffa81599efdf06725827a59`. Record a hash for every future checkpoint. |
 | C2 | The per-epoch loss table in docs/03 ("clean 5-hour run", 7 epochs) comes from a run doc 03 itself **retracts** (broken mask). | That loss curve describes training toward a scrambled target. | Don't cite it. |
 | C3 | All training runs before the mask fix (88.56% WER mask) are retracted. | | Cite only post-fix numbers. Throughput figures (1.5–3.6 utterances/s on CPU) remain valid. |
+| C5 | The trained router arrived as an unzipped PyTorch archive folder (`router_hi_id/`). It was repacked byte-for-byte into `checkpoints/router_hi_id.pt` (all 136 router tensors load). The adapter used during its training isn't recorded. | See R18 | Keep the `.pt` file intact when copying it from Colab |
 | C4 | The deck lists the backbone as 600 M. | See the S9 note. | Name both models. |
 
 ## 6. Known limitations (for the discussion chapter)

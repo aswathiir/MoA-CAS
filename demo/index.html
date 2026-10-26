@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MoA-CAS Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --orange: #f26b0f;
+    --orange-soft: #fff3ea;
+    --ink: #1f2328;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #ffffff;
+    --card: #ffffff;
+    --ok: #15803d;
+    --ok-bg: #e9f7ee;
+    --bad: #b42318;
+    --bad-bg: #fdecea;
+    --ins: #9a6700;
+    --ins-bg: #fff4d6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: Inter, "Noto Sans Devanagari", system-ui, sans-serif; line-height: 1.55;
+  }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 56px 24px 80px; }
+
+  /* ---------- hero (left) + form card (right), as in the reference layout ---------- */
+  .top { display: grid; grid-template-columns: 1.25fr 1fr; gap: 56px; align-items: center; }
+  h1 {
+    font-family: "Source Serif 4", Georgia, serif; font-weight: 700; color: var(--orange);
+    font-size: clamp(48px, 7vw, 84px); line-height: 1; margin: 0 0 28px; letter-spacing: -1px;
+  }
+  .badges { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px; }
+  .badge {
+    border: 3px solid var(--orange); color: var(--orange); border-radius: 14px;
+    padding: 4px 10px; font-size: 16px; white-space: nowrap;
+  }
+  .lede { color: var(--muted); font-size: 17px; margin: 0 0 28px; max-width: 640px; }
+  .lede b { color: var(--ink); font-weight: 500; }
+  .pills { display: flex; flex-wrap: wrap; gap: 10px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px; border: 3px solid var(--ink);
+    border-radius: 16px; padding: 5px 14px; color: var(--ink); text-decoration: none; font-size: 17px;
+  }
+  .pill:hover { background: #f6f6f6; }
+  .pill svg { width: 20px; height: 20px; }
+
+  .card {
+    border: 1.5px solid var(--orange); border-radius: 6px; background: var(--card);
+    box-shadow: 0 10px 40px rgba(0,0,0,.08); padding: 28px 28px 24px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+  }
+  .card label.lbl { color: var(--muted); font-size: 16px; text-align: center; }
+  .card label.lbl::after { content: " *"; color: #e11d48; }
+  select, textarea {
+    width: 100%; max-width: 380px; font: inherit; color: var(--ink); background: #fff;
+    border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px;
+  }
+  select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23111' stroke-width='2' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; }
+  textarea { min-height: 86px; resize: vertical; font-family: "Noto Sans Devanagari", Inter, sans-serif; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { font: inherit; border: 0; background: #fff; padding: 7px 14px; color: var(--muted); cursor: pointer; }
+  .seg button.on { background: var(--orange-soft); color: var(--orange); font-weight: 600; }
+  .toggle { position: relative; width: 46px; height: 26px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle span { position: absolute; inset: 0; background: #d1d5db; border-radius: 26px; cursor: pointer; transition: .2s; }
+  .toggle span::before { content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .toggle input:checked + span { background: var(--orange); }
+  .toggle input:checked + span::before { transform: translateX(20px); }
+  audio { width: 100%; max-width: 380px; height: 36px; }
+  .row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    font: inherit; font-weight: 600; color: var(--orange); background: #f3f4f6; border: 0;
+    border-radius: 6px; padding: 10px 24px; cursor: pointer;
+  }
+  .btn:hover { background: var(--orange-soft); }
+  .btn:disabled { opacity: .5; cursor: wait; }
+  .btn.ghost { color: var(--ink); background: #fff; border: 1px solid var(--line); font-weight: 500; padding: 8px 14px; }
+  .btn.rec { color: #fff; background: #e11d48; }
+  .hint { font-size: 13px; color: var(--muted); text-align: center; max-width: 380px; }
+  .hidden { display: none !important; }
+
+  /* ---------- results ---------- */
+  .section-title { font-size: 22px; font-weight: 600; margin: 64px 0 6px; }
+  .section-sub { color: var(--muted); margin: 0 0 20px; }
+  .ref { border-left: 4px solid var(--orange); background: var(--orange-soft); padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 20px; font-family: "Noto Sans Devanagari", Inter, sans-serif; font-size: 18px; }
+  .ref small { display: block; color: var(--muted); font-family: Inter, sans-serif; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; margin-bottom: 2px; }
+  .grid3 { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 18px; }
+  .out { border: 1px solid var(--line); border-radius: 10px; padding: 18px; background: #fff; display: flex; flex-direction: column; gap: 12px; }
+  .out.router { border: 1.5px solid var(--orange); }
+  .out h3 { margin: 0; font-size: 17px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .out h3 small { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .desc { color: var(--muted); font-size: 13px; margin: -6px 0 0; }
+  .hyp { font-family: "Noto Sans Devanagari", Inter, sans-serif; font-size: 18px; line-height: 2.1; min-height: 60px; }
+  .w { padding: 2px 3px; border-radius: 4px; margin-right: 2px; }
+  .w.ok { background: var(--ok-bg); color: var(--ok); }
+  .w.sub { background: var(--bad-bg); color: var(--bad); }
+  .w.ins { background: var(--ins-bg); color: var(--ins); text-decoration: line-through; }
+  .stats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stat { border-radius: 999px; padding: 3px 10px; font-size: 13px; background: #f3f4f6; }
+  .stat b { font-weight: 600; }
+  .stat.best { background: var(--orange); color: #fff; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin: 14px 0 0; }
+  .legend span::before { content: ""; display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .lg-ok::before { background: var(--ok-bg); border: 1px solid var(--ok); }
+  .lg-sub::before { background: var(--bad-bg); border: 1px solid var(--bad); }
+  .lg-ins::before { background: var(--ins-bg); border: 1px solid var(--ins); }
+  .lg-del::before { background: #fff; border: 1px dashed var(--muted); }
+
+  .trace { border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-top: 18px; }
+  .trace h3 { margin: 0 0 4px; font-size: 17px; }
+  .trace svg { width: 100%; height: auto; display: block; margin-top: 10px; }
+  .rw { font-family: "Noto Sans Devanagari", Inter, sans-serif; font-size: 18px; line-height: 2.2; margin-top: 10px; }
+  .rw .w { color: var(--ink); }
+
+  .bench { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .kpi .v { font-size: 30px; font-weight: 600; }
+  .kpi .l { color: var(--muted); font-size: 14px; }
+  .kpi.router { border-color: var(--orange); }
+  .kpi.router .v { color: var(--orange); }
+  .note { background: #f9fafb; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; color: #374151; font-size: 14px; margin-top: 14px; }
+  .err { color: var(--bad); font-size: 14px; text-align: center; }
+  .spinner { width: 16px; height: 16px; border: 2px solid var(--orange-soft); border-top-color: var(--orange); border-radius: 50%; display: inline-block; animation: spin .8s linear infinite; vertical-align: -3px; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 900px) {
+    .wrap { padding: 32px 16px 60px; }
+    .top, .grid3, .bench { grid-template-columns: minmax(0, 1fr); }
+    .top { gap: 32px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section class="top">
+    <div>
+      <h1>MoA-CAS</h1>
+      <div class="badges">
+        <span class="badge">Team C-15</span>
+        <span class="badge" id="badge-steps">Router · trained</span>
+        <span class="badge" id="badge-params">Trainable params</span>
+      </div>
+      <p class="lede">
+        <b>Mixture-of-Adapters for Code-Switched ASR.</b> A frozen IndicConformer speech model never
+        changes. Small Hindi <b>adapters</b> sit inside it, and a <b>frame-level router</b> decides, every
+        40&nbsp;ms, how much of the adapter to use, so a speaker can switch between Hindi and English
+        mid-sentence. Pick an utterance and compare what the <b>base model</b>, the
+        <b>adapter alone</b>, and the <b>router</b> each hear.
+      </p>
+      <div class="pills">
+        <a class="pill" href="https://github.com/aswathiir/MoA-CAS/tree/test" target="_blank" rel="noopener">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          Github
+        </a>
+        <a class="pill" href="https://github.com/aswathiir/MoA-CAS/blob/test/docs/05_ROUTER.md" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.4 11.1l-9.2 9.2a6 6 0 01-8.5-8.5l9.2-9.2a4 4 0 015.7 5.7l-9.2 9.2a2 2 0 01-2.8-2.8l8.5-8.5"/></svg>
+          Router doc
+        </a>
+        <a class="pill" href="https://github.com/aswathiir/MoA-CAS/blob/test/docs/THESIS_REFERENCE.md" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20V3H6.5A2.5 2.5 0 004 5.5v14z"/><path d="M20 17v4H6.5A2.5 2.5 0 014 18.5"/></svg>
+          Thesis reference
+        </a>
+      </div>
+    </div>
+
+    <form class="card" id="form" onsubmit="return false">
+      <label class="lbl" for="model">Select Model:</label>
+      <select id="model">
+        <option value="all">Compare all three</option>
+        <option value="base">Base model (frozen IndicConformer)</option>
+        <option value="adapter">Base + Hindi adapter</option>
+        <option value="router">MoA-CAS router</option>
+      </select>
+
+      <label class="lbl">Select Audio Source:</label>
+      <div class="seg" role="tablist">
+        <button type="button" id="src-sample" class="on">MUCS test sample</button>
+        <button type="button" id="src-own">Upload / record</button>
+      </div>
+
+      <div id="sample-box" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:10px">
+        <select id="sample"><option>Loading samples…</option></select>
+      </div>
+
+      <div id="own-box" class="hidden" style="width:100%;display:flex;flex-direction:column;align-items:center;gap:10px">
+        <div class="row">
+          <label class="btn ghost" for="file">Choose file</label>
+          <input id="file" type="file" accept="audio/*" class="hidden">
+          <button type="button" class="btn ghost" id="rec">● Record</button>
+        </div>
+        <div class="hint" id="own-hint">WAV, MP3, FLAC or a microphone recording, up to 30&nbsp;s. It's converted to 16&nbsp;kHz mono in your browser.</div>
+      </div>
+
+      <audio id="player" controls class="hidden"></audio>
+
+      <label class="lbl" for="reference">Reference Transcript:</label>
+      <textarea id="reference" placeholder="Optional for your own audio; needed for WER"></textarea>
+
+      <label class="lbl">Transliteration-aware Scoring:</label>
+      <label class="toggle"><input type="checkbox" id="translit"><span></span></label>
+      <div class="hint" style="margin-top:-6px">Counts <i>document</i> ≈ <i>डॉक्यूमेंट</i> as a match.</div>
+
+      <label class="lbl">Show Routing Trace:</label>
+      <label class="toggle"><input type="checkbox" id="showtrace" checked><span></span></label>
+
+      <button type="button" class="btn" id="go">Transcribe</button>
+      <div class="err" id="err"></div>
+    </form>
+  </section>
+
+  <section id="results" class="hidden">
+    <div class="section-title">What each system heard</div>
+    <p class="section-sub" id="res-sub"></p>
+    <div class="ref" id="ref-box"><small>Reference</small><span id="ref-text"></span></div>
+    <div class="grid3" id="outs"></div>
+    <div class="legend" id="legend">
+      <span class="lg-ok">correct word</span><span class="lg-sub">wrong word</span>
+      <span class="lg-ins">extra word</span><span class="lg-del">missed reference words (counted)</span>
+    </div>
+
+    <div class="trace" id="trace">
+      <h3>Router decisions over time</h3>
+      <div class="desc">For each 40&nbsp;ms frame, the share of the signal sent through the <b>Hindi adapter</b> (orange, top)
+        versus the <b>untouched backbone</b> (grey, bottom), averaged over the 17 encoder layers. Each word below is shaded by the same share.</div>
+      <svg id="trace-svg" viewBox="0 0 1000 170" preserveAspectRatio="none"></svg>
+      <div class="rw" id="trace-words"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-title">Measured on 100 MUCS test utterances</div>
+    <p class="section-sub">Same 100 Hindi-English utterances for every system. Word error rate, lower is better.</p>
+    <div class="bench" id="bench"></div>
+    <div class="note" id="bench-note">
+      How to read this: the router beats the frozen base model, but it doesn't yet beat using the Hindi adapter
+      on every frame, and its routing doesn't follow where the English words are. About 25% of reference words are
+      English in Latin script, which this backbone has no letters for. It writes <i>डॉक्यूमेंट</i> for <i>document</i>,
+      so no system here can get those words exactly right. See <i>docs/05_ROUTER.md</i>.
+    </div>
+  </section>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const LABELS = {
+  base: ["Base model", "Frozen IndicConformer, no adaptation"],
+  adapter: ["Base + Hindi adapter", "Stage 1 adapter applied on every frame"],
+  router: ["MoA-CAS router", "Router mixes adapter and base, frame by frame"],
+};
+let source = "sample", ownAudio = null, samples = [], recorder = null, chunks = [];
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const pct = (x) => (100 * x).toFixed(1) + "%";
+
+async function init() {
+  try {
+    const info = await (await fetch("/api/info")).json();
+    $("badge-steps").textContent = `Router · ${info.router.steps.toLocaleString()} steps · ${info.router.epochs} epochs`;
+    const added = info.params.adapter + info.params.router;
+    $("badge-params").textContent = `${(100 * added / info.params.backbone).toFixed(2)}% trainable params`;
+    const b = info.benchmarks;
+    $("bench").innerHTML = ["base", "adapter", "router"].map((k) => b[k] ? `
+      <div class="kpi ${k}"><div class="v">${b[k].wer.toFixed(2)}%</div>
+      <div class="l">${LABELS[k][0]} · CER ${b[k].cer.toFixed(2)}% · n=${b[k].n}</div></div>` :
+      `<div class="kpi ${k}"><div class="v">n/a</div><div class="l">${LABELS[k][0]}: not evaluated yet</div></div>`).join("");
+
+    samples = await (await fetch("/api/samples")).json();
+    $("sample").innerHTML = samples.map((s, i) => {
+      const tag = s.is_code_mixed ? `${Math.round(100 * s.en_fraction)}% English` : "pure Hindi";
+      return `<option value="${s.utt_id}">#${i + 1} · ${s.duration}s · ${tag} · ${esc(s.text.slice(0, 42))}…</option>`;
+    }).join("");
+    pickSample();
+  } catch (e) {
+    $("err").textContent = "Could not reach the demo server. Is scripts/demo_server.py running?";
+  }
+}
+
+function pickSample() {
+  const s = samples.find((x) => x.utt_id === $("sample").value);
+  if (!s) return;
+  $("player").src = `/api/audio/${s.utt_id}`;
+  $("player").classList.remove("hidden");
+  $("reference").value = s.text;
+}
+
+function setSource(which) {
+  source = which;
+  $("src-sample").classList.toggle("on", which === "sample");
+  $("src-own").classList.toggle("on", which === "own");
+  $("sample-box").classList.toggle("hidden", which !== "sample");
+  $("own-box").classList.toggle("hidden", which !== "own");
+  $("reference").readOnly = which === "sample";
+  if (which === "sample") pickSample();
+  else { $("reference").value = ""; $("player").classList.toggle("hidden", !ownAudio); if (ownAudio) $("player").src = ownAudio.url; }
+}
+
+// Decode any browser-playable audio, then resample to 16 kHz mono float32.
+async function toPCM16k(blob) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+  ctx.close();
+  const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * 16000), 16000);
+  const node = off.createBufferSource();
+  node.buffer = decoded; node.connect(off.destination); node.start();
+  return (await off.startRendering()).getChannelData(0);
+}
+
+async function useBlob(blob, label) {
+  try {
+    const pcm = await toPCM16k(blob);
+    ownAudio = { pcm, url: URL.createObjectURL(blob) };
+    $("player").src = ownAudio.url; $("player").classList.remove("hidden");
+    $("own-hint").textContent = `${label}: ${(pcm.length / 16000).toFixed(1)} s ready.`;
+    $("err").textContent = "";
+  } catch (e) { $("err").textContent = "Couldn't decode that audio file."; }
+}
+
+async function toggleRecord() {
+  if (recorder && recorder.state === "recording") { recorder.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recorder = new MediaRecorder(stream); chunks = [];
+    recorder.ondataavailable = (e) => chunks.push(e.data);
+    recorder.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop());
+      $("rec").textContent = "● Record"; $("rec").classList.remove("rec");
+      useBlob(new Blob(chunks, { type: recorder.mimeType }), "Recording");
+    };
+    recorder.start();
+    $("rec").textContent = "■ Stop"; $("rec").classList.add("rec");
+  } catch (e) { $("err").textContent = "Microphone not available."; }
+}
+
+async function transcribe() {
+  $("err").textContent = "";
+  const btn = $("go");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Transcribing…';
+  try {
+    let res;
+    if (source === "sample") {
+      res = await fetch(`/api/transcribe/${$("sample").value}`, { method: "POST" });
+    } else {
+      if (!ownAudio) throw new Error("Choose a file or record something first.");
+      const headers = { "Content-Type": "application/octet-stream" };
+      const ref = $("reference").value.trim();
+      if (ref) headers["X-Reference"] = unescape(encodeURIComponent(ref));  // UTF-8 bytes as latin-1
+      res = await fetch("/api/transcribe_audio", { method: "POST", headers, body: ownAudio.pcm.buffer });
+    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || "Transcription failed");
+    render(data);
+  } catch (e) { $("err").textContent = e.message; }
+  btn.disabled = false; btn.textContent = "Transcribe";
+}
+
+function render(data) {
+  const modes = $("model").value === "all" ? ["base", "adapter", "router"] : [$("model").value];
+  const translit = $("translit").checked;
+  const hasRef = !!data.reference;
+  const metric = (r) => translit ? r.wer_translit : r.wer;
+
+  $("results").classList.remove("hidden");
+  $("ref-box").classList.toggle("hidden", !hasRef);
+  $("ref-text").textContent = data.reference || "";
+  $("legend").classList.toggle("hidden", !hasRef);
+  $("res-sub").textContent = `${data.duration} s of audio` + (data.utt_id ? ` · ${data.utt_id}` : " · your audio") +
+    (hasRef ? ` · ${translit ? "transliteration-aware WER" : "standard WER"}` : " · no reference, so no WER");
+
+  const best = hasRef ? Math.min(...modes.map((m) => metric(data.results[m]))) : null;
+  $("outs").style.setProperty("--cols", modes.length);
+  $("outs").innerHTML = modes.map((m) => {
+    const r = data.results[m];
+    const words = r.hypothesis.split(/\s+/).filter(Boolean);
+    const hyp = hasRef && r.tags && r.tags.length === words.length
+      ? words.map((w, i) => `<span class="w ${r.tags[i]}">${esc(w)}</span>`).join(" ")
+      : esc(r.hypothesis) || "<i style='color:var(--muted)'>(nothing emitted)</i>";
+    const stats = hasRef ? `
+      <span class="stat ${metric(r) === best && modes.length > 1 ? "best" : ""}">WER <b>${pct(metric(r))}</b></span>
+      <span class="stat">CER <b>${pct(r.cer)}</b></span>
+      <span class="stat">missed <b>${r.deletions}</b></span>` : "";
+    const share = m === "router" ? `<span class="stat">adapter share <b>${pct(r.mean_adapter_weight)}</b></span>` : "";
+    return `<div class="out ${m}">
+      <h3>${LABELS[m][0]} <small>${r.latency_ms} ms</small></h3>
+      <div class="desc">${LABELS[m][1]}</div>
+      <div class="hyp">${hyp}</div>
+      <div class="stats">${stats}${share}</div></div>`;
+  }).join("");
+
+  const showTrace = $("showtrace").checked && modes.includes("router");
+  $("trace").classList.toggle("hidden", !showTrace);
+  if (showTrace) drawTrace(data.results.router, data.duration);
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function drawTrace(r, duration) {
+  const W = 1000, H = 170, top = 10, h = 120, base = top + h;
+  const fw = r.frame_weights, n = fw.length || 1;
+  const x = (i) => (i / n) * W, y = (v) => base - v * h;
+  let area = `M0 ${base} ` + fw.map((v, i) => `L${x(i).toFixed(1)} ${y(v).toFixed(1)} L${x(i + 1).toFixed(1)} ${y(v).toFixed(1)}`).join(" ") + ` L${W} ${base} Z`;
+  let ticks = "";
+  for (let s = 0; s <= duration; s += 1) {
+    const tx = (s * 25 / n) * W;
+    ticks += `<line x1="${tx}" y1="${base}" x2="${tx}" y2="${base + 6}" stroke="#9ca3af"/>
+              <text x="${tx + 3}" y="${base + 22}" font-size="12" fill="#6b7280">${s}s</text>`;
+  }
+  const marks = r.words.map((w) => `<line x1="${x(w.start)}" y1="${top}" x2="${x(w.start)}" y2="${base}" stroke="#111" stroke-opacity=".12"/>`).join("");
+  $("trace-svg").innerHTML = `
+    <rect x="0" y="${top}" width="${W}" height="${h}" fill="#f3f4f6"/>
+    <path d="${area}" fill="#f26b0f" fill-opacity=".85"/>
+    <line x1="0" y1="${y(0.5)}" x2="${W}" y2="${y(0.5)}" stroke="#111" stroke-dasharray="4 4" stroke-opacity=".35"/>
+    <text x="6" y="${top + 14}" font-size="12" fill="#7c2d12">adapter</text>
+    <text x="6" y="${base - 6}" font-size="12" fill="#374151">base</text>
+    ${marks}${ticks}`;
+  $("trace-words").innerHTML = r.words.map((w) =>
+    `<span class="w" title="${w.time}s · adapter ${pct(w.adapter_weight)}" style="background:rgba(242,107,15,${(0.08 + 0.75 * w.adapter_weight).toFixed(2)})">${esc(w.text)}</span>`
+  ).join(" ") || "<i style='color:var(--muted)'>(nothing emitted)</i>";
+}
+
+$("src-sample").onclick = () => setSource("sample");
+$("src-own").onclick = () => setSource("own");
+$("sample").onchange = pickSample;
+$("file").onchange = (e) => e.target.files[0] && useBlob(e.target.files[0], e.target.files[0].name);
+$("rec").onclick = toggleRecord;
+$("go").onclick = transcribe;
+$("translit").onchange = () => window._last && render(window._last);
+const _render = render;
+render = (d) => { window._last = d; _render(d); };
+$("model").onchange = () => window._last && render(window._last);
+$("showtrace").onchange = () => window._last && render(window._last);
+init();
+</script>
+</body>
+</html>

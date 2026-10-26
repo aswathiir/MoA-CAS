@@ -39,7 +39,7 @@ audio ─► frozen encoder layer ─┬─► Hindi adapter ─┐
 | Baseline benchmark | ✅ Done | [docs/01](docs/01_BASELINE_AND_PROBLEM_ANALYSIS.md), `results/*.csv` |
 | Trainable backbone (NeMo IndicConformer, 5 loading bugs fixed) | ✅ Done | [docs/04](docs/04_HOW_THE_ADAPTER_SYSTEM_WORKS.md) |
 | Hindi adapter (Stage 1) | ✅ Trained and measured | [docs/03](docs/03_PROFILE_LEARNING_ADAPTERS.md), `results/adapter_eval/` |
-| Router (Stage 2) | ✅ Built and tested; ⏳ **no full training run yet** | [docs/05](docs/05_ROUTER.md) |
+| Router (Stage 2) | ✅ Trained (38,531 steps, 5 epochs) and measured. It beats the base model but **not yet the adapter alone**. | [docs/05](docs/05_ROUTER.md), `results/router_eval/` |
 | Bengali adapter | ⏳ Code ready, never run | — |
 | English adapter | ⛔ Blocked: no English speech data, and the model can't write Latin letters | [docs/05 §3](docs/05_ROUTER.md) |
 | Accent adapters | ⏳ Planned for next semester | — |
@@ -54,10 +54,13 @@ audio ─► frozen encoder layer ─┬─► Hindi adapter ─┐
 | Same, **with the Hindi adapter** | **52.84%**: −14.3 points, 55 better / 23 worse, t = −4.81 |
 | NeMo backbone, no adapter, full mixed MUCS | 55.37% |
 | Same, **with the Hindi adapter** | **46.60%**: −8.8 points, t = −3.56 |
+| Same, **with the MoA-CAS router** | **50.50%**: −4.9 points vs base (t = −2.30), but +3.9 vs adapter alone (t = +2.75) |
+| Router on the Hindi-only part | 58.25%: −8.9 vs base (t = −3.69), +5.4 vs adapter alone (t = +3.36) |
 
 What these numbers mean, in plain words:
 - **Most of the 7.9% → 57% gap is not code-switching.** Even pure-Hindi sentences from the tutorial corpus score ~54%. Most of the gap comes from the domain (software tutorials, recording conditions) and from how the corpus is cut into segments ([docs/01 §4](docs/01_BASELINE_AND_PROBLEM_ANALYSIS.md)).
 - **The adapter genuinely helps,** but mainly by adapting to this corpus and its vocabulary. It doesn't yet handle English ([docs/03](docs/03_PROFILE_LEARNING_ADAPTERS.md)).
+- **The router works, but it hasn't learned *language* routing yet.** It splits the signal roughly 46/54 between the adapter and the base model on almost every frame. Its choices don't follow where the English words are (r = 0.02), so it loses to simply applying the adapter everywhere.
 - **About 25% of reference words are English in Latin script, and the model has no Latin letters to write them with.** It writes `डॉक्यूमेंट` for `document`. That puts a floor of roughly 25% under word error rate that no adapter or router can remove.
 
 The full list of claims, numbers, sources and caveats is in **[docs/THESIS_REFERENCE.md](docs/THESIS_REFERENCE.md)**.
@@ -121,6 +124,19 @@ python scripts/train_router.py --lang hi --expert hi=checkpoints/hi_adapter.pt -
 python scripts/evaluate_router.py --lang hi --expert hi=checkpoints/hi_adapter.pt --expert identity --manifest data/manifests/mucs_hi-en_test.jsonl --limit 100 --router-checkpoint checkpoints/router_hi_id.pt
 ```
 
+**Live demo: base vs adapter vs router, side by side.**
+
+```bash
+python scripts/demo_server.py
+```
+
+Then open http://127.0.0.1:8000. Pick one of the 100 MUCS test utterances, or upload or record your own audio. The demo shows:
+- what each system transcribes, with every word marked correct, wrong or extra against the reference;
+- WER and CER, plus an optional transliteration-aware score;
+- a frame-by-frame chart of how much the router sent through the Hindi adapter.
+
+All three systems run on one loaded model. They differ only in the routing weights: base = [0, 1], adapter = [1, 0], router = learned. The demo reads `checkpoints/router_hi_id.pt` and `checkpoints/hi_adapter.pt`.
+
 **Score while forgiving script mismatch** (`document` ≈ `डॉक्यूमेंट`):
 
 ```bash
@@ -143,10 +159,11 @@ src/moa_cas/
     router.py          the router + mixture of adapters (Stage 2)
     decode.py          greedy CTC decoding
   metrics.py         WER / CER
-scripts/             runnable entry points (benchmark, train, evaluate, score)
+scripts/             runnable entry points (benchmark, train, evaluate, score, demo_server)
+demo/index.html      the demo page served by scripts/demo_server.py
 data/manifests/      one JSON line per utterance: audio path, text, language counts, speaker
 results/             every CSV a reported number comes from
-tests/               45 tests, including ones that pin documented numbers to the CSVs
+tests/               49 tests, including ones that pin documented numbers to the CSVs
 docs/                the write-ups below
 ```
 
