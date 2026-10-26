@@ -65,6 +65,7 @@
   textarea { min-height: 86px; resize: vertical; font-family: "Noto Sans Devanagari", Inter, sans-serif; }
   .seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   .seg button { font: inherit; border: 0; background: #fff; padding: 7px 14px; color: var(--muted); cursor: pointer; }
+  .seg button:disabled { cursor: not-allowed; opacity: .55; }
   .seg button.on { background: var(--orange-soft); color: var(--orange); font-weight: 600; }
   .toggle { position: relative; width: 46px; height: 26px; }
   .toggle input { opacity: 0; width: 0; height: 0; }
@@ -238,17 +239,21 @@
     <div class="section-title">Measured on 100 MUCS test utterances</div>
     <p class="section-sub">Same 100 Hindi-English utterances for every system. Word error rate, lower is better.</p>
     <div class="bench" id="bench"></div>
-    <div class="note" id="bench-note">
-      How to read this: the router beats the frozen base model, but it doesn't yet beat using the Hindi adapter
-      on every frame, and its routing doesn't follow where the English words are. About 25% of reference words are
-      English in Latin script, which this backbone has no letters for. It writes <i>डॉक्यूमेंट</i> for <i>document</i>,
-      so no system here can get those words exactly right. See <i>docs/05_ROUTER.md</i>.
-    </div>
   </section>
 </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
+// Static mode (the hosted Vercel copy): precomputed results, no live model.
+// scripts/export_static_demo.py sets this flag in the exported page.
+const STATIC = !!window.MOA_STATIC;
+const API = STATIC ? {
+  info: "data/info.json", samples: "data/samples.json",
+  audio: (id) => `audio/${id}.wav`, result: (id) => `data/results/${id}.json`,
+} : {
+  info: "/api/info", samples: "/api/samples",
+  audio: (id) => `/api/audio/${id}`, result: (id) => `/api/transcribe/${id}`,
+};
 const LABELS = {
   base: ["Base model", "Frozen IndicConformer, no adaptation"],
   adapter: ["Base + Hindi adapter", "Stage 1 adapter applied on every frame"],
@@ -261,7 +266,7 @@ const pct = (x) => (100 * x).toFixed(1) + "%";
 
 async function init() {
   try {
-    const info = await (await fetch("/api/info")).json();
+    const info = await (await fetch(API.info)).json();
     $("badge-steps").textContent = `Router · ${info.router.steps.toLocaleString()} steps · ${info.router.epochs} epochs`;
     const added = info.params.adapter + info.params.router;
     $("badge-params").textContent = `${(100 * added / info.params.backbone).toFixed(2)}% trainable params`;
@@ -271,21 +276,21 @@ async function init() {
       <div class="l">${LABELS[k][0]} · CER ${b[k].cer.toFixed(2)}% · n=${b[k].n}</div></div>` :
       `<div class="kpi ${k}"><div class="v">n/a</div><div class="l">${LABELS[k][0]}: not evaluated yet</div></div>`).join("");
 
-    samples = await (await fetch("/api/samples")).json();
+    samples = await (await fetch(API.samples)).json();
     $("sample").innerHTML = samples.map((s, i) => {
       const tag = s.is_code_mixed ? `${Math.round(100 * s.en_fraction)}% English` : "pure Hindi";
       return `<option value="${s.utt_id}">#${i + 1} · ${s.duration}s · ${tag} · ${esc(s.text.slice(0, 42))}…</option>`;
     }).join("");
     pickSample();
   } catch (e) {
-    $("err").textContent = "Could not reach the demo server. Is scripts/demo_server.py running?";
+    $("err").textContent = STATIC ? "Could not load the demo data." : "Could not reach the demo server. Is scripts/demo_server.py running?";
   }
 }
 
 function pickSample() {
   const s = samples.find((x) => x.utt_id === $("sample").value);
   if (!s) return;
-  $("player").src = `/api/audio/${s.utt_id}`;
+  $("player").src = API.audio(s.utt_id);
   $("player").classList.remove("hidden");
   $("reference").value = s.text;
 }
@@ -345,7 +350,7 @@ async function transcribe() {
   try {
     let res;
     if (source === "sample") {
-      res = await fetch(`/api/transcribe/${$("sample").value}`, { method: "POST" });
+      res = await fetch(API.result($("sample").value), STATIC ? {} : { method: "POST" });
     } else {
       if (!ownAudio) throw new Error("Choose a file or record something first.");
       const headers = { "Content-Type": "application/octet-stream" };
@@ -425,6 +430,11 @@ function drawTrace(r, duration) {
 
 $("src-sample").onclick = () => setSource("sample");
 $("src-own").onclick = () => setSource("own");
+if (STATIC) {
+  $("src-own").disabled = true;
+  $("src-own").title = "Live transcription of your own audio needs the local server (scripts/demo_server.py)";
+  $("src-own").textContent = "Upload / record (local only)";
+}
 $("sample").onchange = pickSample;
 $("file").onchange = (e) => e.target.files[0] && useBlob(e.target.files[0], e.target.files[0].name);
 $("rec").onclick = toggleRecord;

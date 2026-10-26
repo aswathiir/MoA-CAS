@@ -171,6 +171,34 @@ def summarise_csv(path: Path):
             "cer": round(100 * statistics.mean(float(r["cer"]) for r in rows), 2), "file": str(path.relative_to(ROOT))}
 
 
+def build_info(demo: Demo) -> dict:
+    res = ROOT / "results"
+    return {
+        "router": demo.router_meta, "experts": demo.names, "params": demo.params,
+        "benchmarks": {
+            "base": summarise_csv(res / "adapter_eval" / "nemo_baseline_fixed.csv"),
+            "adapter": summarise_csv(res / "adapter_eval" / "eval_adapt_mixed_ckpt0917.csv"),
+            "router": summarise_csv(res / "router_eval" / "router_hi_id_mixed.csv"),
+        },
+    }
+
+
+def build_samples(demo: Demo) -> list:
+    return [{
+        "utt_id": r["utt_id"], "text": r["text"], "duration": r["duration"],
+        "en_fraction": round(r["n_words_en"] / max(r["n_words"], 1), 2),
+        "is_code_mixed": r["is_code_mixed"], "n_cs_points": r["n_cs_points"],
+    } for r in demo.samples.values()]
+
+
+def transcribe_sample(demo: Demo, utt_id: str) -> dict:
+    row = demo.samples[utt_id]
+    wav, sr = sf.read(ROOT / row["audio_filepath"], dtype="float32")
+    if sr != SAMPLE_RATE:
+        raise ValueError(f"manifest audio is {sr} Hz, expected {SAMPLE_RATE}")
+    return {"utt_id": utt_id, "reference": row["text"], **demo.transcribe(wav, row["text"])}
+
+
 def create_app(demo: Demo) -> FastAPI:
     app = FastAPI(title="MoA-CAS demo")
 
@@ -180,23 +208,11 @@ def create_app(demo: Demo) -> FastAPI:
 
     @app.get("/api/info")
     def info():
-        res = ROOT / "results"
-        return {
-            "router": demo.router_meta, "experts": demo.names, "params": demo.params,
-            "benchmarks": {
-                "base": summarise_csv(res / "adapter_eval" / "nemo_baseline_fixed.csv"),
-                "adapter": summarise_csv(res / "adapter_eval" / "eval_adapt_mixed_ckpt0917.csv"),
-                "router": summarise_csv(res / "router_eval" / "router_hi_id_mixed.csv"),
-            },
-        }
+        return build_info(demo)
 
     @app.get("/api/samples")
     def samples():
-        return [{
-            "utt_id": r["utt_id"], "text": r["text"], "duration": r["duration"],
-            "en_fraction": round(r["n_words_en"] / max(r["n_words"], 1), 2),
-            "is_code_mixed": r["is_code_mixed"], "n_cs_points": r["n_cs_points"],
-        } for r in demo.samples.values()]
+        return build_samples(demo)
 
     @app.get("/api/audio/{utt_id}")
     def audio(utt_id: str):
@@ -206,14 +222,10 @@ def create_app(demo: Demo) -> FastAPI:
         return FileResponse(ROOT / row["audio_filepath"], media_type="audio/wav")
 
     @app.post("/api/transcribe/{utt_id}")
-    def transcribe_sample(utt_id: str):
-        row = demo.samples.get(utt_id)
-        if not row:
+    def transcribe(utt_id: str):
+        if utt_id not in demo.samples:
             raise HTTPException(404, "unknown utterance")
-        wav, sr = sf.read(ROOT / row["audio_filepath"], dtype="float32")
-        if sr != SAMPLE_RATE:
-            raise HTTPException(500, f"manifest audio is {sr} Hz, expected {SAMPLE_RATE}")
-        return {"utt_id": utt_id, "reference": row["text"], **demo.transcribe(wav, row["text"])}
+        return transcribe_sample(demo, utt_id)
 
     @app.post("/api/transcribe_audio")
     async def transcribe_audio(request: Request):

@@ -137,6 +137,18 @@ Then open http://127.0.0.1:8000. Pick one of the 100 MUCS test utterances, or up
 
 All three systems run on one loaded model. They differ only in the routing weights: base = [0, 1], adapter = [1, 0], router = learned. The demo reads `checkpoints/router_hi_id.pt` and `checkpoints/hi_adapter.pt`.
 
+**Hosted (static) copy of the demo.** Vercel and other static hosts can't run the model, so export the precomputed results for the 100 samples (about 18 MB, including audio) and deploy that folder:
+
+```bash
+python scripts/export_static_demo.py --out demo_static
+```
+
+```bash
+cd demo_static && npx vercel deploy --prod
+```
+
+The hosted page shows exactly what the live server shows for those samples. Uploading or recording your own audio works only with the local server.
+
 **Score while forgiving script mismatch** (`document` ≈ `डॉक्यूमेंट`):
 
 ```bash
