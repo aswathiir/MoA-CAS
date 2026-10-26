@@ -75,7 +75,7 @@ them to whichever language appeared last, putting **213 of 256 indices
 (83%) on the wrong columns**. Training loss fell smoothly throughout —
 the adapter simply learned the scrambled target space — and the error
 surfaced only when the backbone was decoded and its WER compared against
-an independent benchmark (88.56% against an expected 57.14%).
+an independent benchmark (88.56% against an expected 57.14%; both scored before correction C6, which puts the benchmark at 59.69%).
 
 Whichever derivation is used, take the tokenizer from the compiled
 `.tokenizer.model` file via the `sentencepiece` library, not the

@@ -4,6 +4,12 @@ The motivating experiment for MoA-CAS: measure how badly a strong
 monolingual Indic ASR model degrades on code-switched speech, and
 establish precisely *what* causes that degradation.
 
+> **Scores corrected on 2026-10-26 (THESIS_REFERENCE C6).** The scoring code
+> used to delete Hindi vowel signs, anusvara and virama before comparing,
+> which under-counted every WER/CER by 2–7.5 points. All figures in this
+> document were rescored from the saved transcripts, except those marked
+> *(pre-C6)*, which couldn't be recomputed. Conclusions are unchanged.
+
 ---
 
 ## 1. Work done
@@ -34,10 +40,10 @@ consequential finding in this document (Section 4).
 
 | Condition | WER | CER | Perfect transcripts | Hallucinations (WER > 100%) |
 |---|---|---|---|---|
-| IndicVoices Hindi (monolingual) | **7.93%** | 4.16% | 36 / 100 | 0 / 100 |
-| MUCS Hindi-English (code-mixed) | **57.14%** | 56.13% | 0 / 100 | 11 / 100 |
+| IndicVoices Hindi (monolingual) | **11.72%** | 4.57% | 24 / 100 | 0 / 100 |
+| MUCS Hindi-English (code-mixed) | **59.69%** | 59.12% | 0 / 100 | 11 / 100 |
 
-A **7.2× degradation** in WER between the two conditions.
+A **5.1× degradation** in WER between the two conditions.
 
 ### Monolingual performance by speaking style
 
@@ -46,9 +52,9 @@ useful sanity check that the model and metric behave sensibly:
 
 | Scenario | WER | n |
 |---|---|---|
-| Read (scripted) | 4.42% | 17 |
-| Extempore (spontaneous) | 6.63% | 53 |
-| Conversation | 12.20% | 30 |
+| Read (scripted) | 7.23% | 17 |
+| Extempore (spontaneous) | 10.49% | 53 |
+| Conversation | 16.43% | 30 |
 
 ### Qualitative failure modes on code-mixed speech
 
@@ -81,7 +87,7 @@ Three distinct behaviours appear when English enters the audio:
   order (not randomly sampled).
 - **Determinism**: CTC greedy decoding is deterministic; re-running the
   benchmark reproduces the identical CSV byte-for-byte. This was
-  verified in practice — the 57.14% figure has been independently
+  verified in practice — the benchmark figure has been independently
   reproduced.
 
 ---
@@ -89,10 +95,10 @@ Three distinct behaviours appear when English enters the audio:
 ## 4. Critical analysis — what the gap actually measures
 
 **This section revises the headline interpretation and should be read
-before citing the 7.9% → 57.1% figure as a "code-switching gap".**
+before citing the 11.7% → 59.7% figure as a "code-switching gap".**
 
 The natural reading of the headline result is that code-switching causes
-the 49-point WER increase. The data does not fully support that.
+the 48-point WER increase. The data does not fully support that.
 
 ### 4a. English density does predict higher error — but only partly
 
@@ -101,20 +107,20 @@ tags from the preprocessing pipeline:
 
 | English share of utterance | Mean WER | n |
 |---|---|---|
-| 0% (pure Hindi) | 53.90% | 12 |
-| 1–20% English | 45.77% | 25 |
-| 20–40% English | 51.54% | 39 |
-| > 40% English | **79.71%** | 24 |
+| 0% (pure Hindi) | 58.96% | 12 |
+| 1–20% English | 50.15% | 25 |
+| 20–40% English | 53.27% | 39 |
+| > 40% English | **80.42%** | 24 |
 
-Pearson correlation between English word share and WER: **r = 0.333**
+Pearson correlation between English word share and WER: **r = 0.289**
 (moderate, positive). Heavily English-laden utterances clearly fail
 harder. So code-switching *is* a genuine, measurable effect.
 
-### 4b. But pure-Hindi utterances in MUCS also fail — at 53.9% WER
+### 4b. But pure-Hindi utterances in MUCS also fail — at 59.0% WER
 
 This is the crucial observation. Utterances in the MUCS test set that
-contain **zero English words** still score **53.90% WER**, against
-**7.93%** for Hindi in IndicVoices. Roughly 46 of the 49 gap points are
+contain **zero English words** still score **58.96% WER**, against
+**11.72%** for Hindi in IndicVoices. Roughly 47 of the 48 gap points are
 therefore present *before any code-switching is involved at all*.
 
 The difference between those two monolingual conditions is not language
@@ -139,7 +145,8 @@ This is measurable in the outputs. Across the benchmarked sample:
 - **10%** of hypotheses are materially shorter than their reference
   (the utterance's own ending was cut off).
 - Utterances showing either artifact average **62.43%** WER, versus
-  **53.37%** for those showing neither.
+  **53.37%** for those showing neither *(pre-C6; the detection script
+  isn't in the repo, so this couldn't be rescored)*.
 
 This was checked against our own extraction code and **is not a bug on
 our side** — the pipeline cuts exactly the `[start, end]` windows the
@@ -150,12 +157,12 @@ hard floor under achievable WER on this test set.
 
 | Contribution | Approximate magnitude |
 |---|---|
-| Domain shift (tutorial/technical speech vs. elicited speech) | The bulk — pure-Hindi MUCS sits at ~54% WER |
+| Domain shift (tutorial/technical speech vs. elicited speech) | The bulk — pure-Hindi MUCS sits at ~59% WER |
 | Coarse segmentation artifacts | ~9 WER points on the ~44% of utterances affected |
-| Code-switching proper | Real but secondary — ~54% → ~80% as English share rises past 40% |
+| Code-switching proper | Real but secondary — ~59% → ~80% as English share rises past 40% |
 
 **Implication for the project**: MoA-CAS targets the code-switching
-component. Even if it worked perfectly, it would not close a 49-point
+component. Even if it worked perfectly, it would not close a 48-point
 gap, because most of that gap is not code-switching. This does not
 invalidate the project — the code-switching effect is real and
 substantial — but the motivating claim needs restating honestly, and the
@@ -168,8 +175,8 @@ evaluation needs a fair control (Section 6).
 Projections, clearly labelled as such — none of this is measured yet.
 
 - **If MoA-CAS addresses only code-switching**, the plausible target is
-  recovering most of the code-switching increment: roughly **57% → 45–50%
-  WER** on this test set. Reaching the ~8% range would additionally
+  recovering most of the code-switching increment: roughly **60% → 48–53%
+  WER** on this test set. Reaching the ~12% range would additionally
   require in-domain adaptation, which is a separate problem from the one
   the architecture is designed to solve.
 - **With a fair in-domain control** (Section 6), the measurable
@@ -195,7 +202,7 @@ Projections, clearly labelled as such — none of this is measured yet.
    fix to the experimental design.
 2. **Benchmark the full test sets.** Only 100 of 3,132 Hindi-English
    utterances have been evaluated. Report confidence intervals — with
-   n=100 and per-utterance WER ranging 0.08–2.11, the headline mean
+   n=100 and per-utterance WER ranging 0.13–2.11, the headline mean
    carries meaningful uncertainty.
 3. **Benchmark Bengali-English at all.** It has never been run; there is
    currently no baseline for the second language pair.

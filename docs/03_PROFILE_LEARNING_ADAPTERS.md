@@ -3,10 +3,16 @@
 Stage 1 of the MoA-CAS two-stage plan: train per-language expert adapters
 on top of a frozen pretrained encoder, before the router is introduced.
 
+> **Scores corrected on 2026-10-26 (THESIS_REFERENCE C6).** The scoring code
+> used to delete Hindi vowel signs, anusvara and virama before comparing,
+> which under-counted every WER/CER by 2–7.5 points. All figures in this
+> document were rescored from the saved transcripts, except those marked
+> *(pre-C6)*, which couldn't be recomputed. Conclusions are unchanged.
+
 > **Update 2026-10-17 — read before citing numbers from this document.**
-> The adapter checkpoint behind the 51.81% / 45.44% results below was
+> The adapter checkpoint behind the 59.45% / 47.89% results below was
 > later overwritten by a shorter run (1,933 steps, 1 epoch). That run
-> reproducibly scores **52.84%** (pure Hindi) and **46.60%** (mixed), and
+> reproducibly scores **60.35%** (pure Hindi) and **48.72%** (mixed), and
 > it is the version the thesis should cite. The per-epoch loss table in §2
 > comes from a run this document itself retracts. The router (Stage 2)
 > now exists: see `05_ROUTER.md`. Verified figures and their sources are
@@ -138,11 +144,11 @@ utterances the ONNX model was independently benchmarked on, and compare.
 
 | Configuration | WER on MUCS Hindi-English test (n=100) |
 |---|---|
-| ONNX IndicConformer (independent benchmark) | 57.14% |
-| NeMo backbone, broken string-matched mask | **88.56%** ❌ |
-| NeMo backbone, corrected block mask | **55.37%** ✅ |
+| ONNX IndicConformer (independent benchmark) | 59.69% |
+| NeMo backbone, broken string-matched mask | **88.56%** ❌ *(pre-C6; no CSV kept)* |
+| NeMo backbone, corrected block mask | **58.06%** ✅ |
 
-The corrected path lands within 1.8 points of an independently measured
+The corrected path lands within 1.6 points of an independently measured
 benchmark — expected for two different checkpoint variants of the same
 model family — and produces fluent Hindi that tracks the reference, with
 English transliterated into Devanagari (`impress` → `इम्प्रेस`,
@@ -178,14 +184,14 @@ Trained on the MUCS Hindi-English **train** split, evaluated on the
 
 | Evaluation set | Baseline | With adapter | Change |
 |---|---|---|---|
-| Pure-Hindi held-out (n=100) — **WER** | 67.18% | **51.81%** | **−15.37 pts (−22.9% relative)** |
-| Pure-Hindi held-out — CER | 56.05% | **40.57%** | −15.48 pts |
-| Pure-Hindi held-out — median WER | 79.29% | **39.57%** | −39.72 pts |
-| Full mixed test set (n=100) — WER | 55.37% | **45.44%** | −9.93 pts (−17.9% relative) |
+| Pure-Hindi held-out (n=100) — **WER** | 72.28% | **59.45%** | **−12.82 pts (−17.7% relative)** |
+| Pure-Hindi held-out — CER | 59.17% | **44.22%** | −14.95 pts |
+| Pure-Hindi held-out — median WER | 81.53% | **46.87%** | −34.66 pts |
+| Full mixed test set (n=100) — WER | 58.06% | **47.89%** | −10.16 pts (−17.5% relative) |
 
 **Paired statistics** on the identical 100 held-out utterances:
-53 improved, 25 worse, 22 unchanged; mean change −0.1537 with a 95%
-confidence interval of **[−0.216, −0.092]**; paired *t* = −4.84. The
+50 improved, 27 worse, 23 unchanged; mean change −0.1282 with a 95%
+confidence interval of **[−0.183, −0.073]**; paired *t* = −4.62. The
 improvement is statistically significant, not noise.
 
 ### Why it improves — the mechanism
@@ -194,7 +200,7 @@ The frozen backbone systematically **under-emits** on this domain: it
 produces only **75%** as many words as the reference contains, truncating
 longer utterances. The adapter raises that ratio to **86%**, recovering
 words the baseline dropped. The gain holds across every duration bucket
-(−0.10 WER for 1–5 s, −0.20 for 5–10 s, −0.17 for >10 s).
+(−0.07 WER for 1–5 s, −0.16 for 5–10 s, −0.17 for >10 s).
 
 Illustrative (baseline → adapter, same utterance):
 
@@ -204,7 +210,7 @@ BASE: तो स् च चमते हैं                                  
 ADAP: अगर स्पेशल फ्लैग का चुनाव न हो तो देखते हैं क्या होता है चलो हम यहाँ आते हैं  (WER 0.05)
 ```
 
-Note the adapter also improves the **mixed** code-switched set (−9.93
+Note the adapter also improves the **mixed** code-switched set (−10.16
 pts) despite being trained only on monolingual Hindi. That is consistent
 with the finding in `01_BASELINE_AND_PROBLEM_ANALYSIS.md` that most of
 the degradation on this corpus is **domain shift rather than
@@ -216,6 +222,8 @@ is exactly what a monolingual in-domain training signal should teach it.
 Splitting the held-out test words by whether the adapter encountered that
 word type during training:
 
+*(pre-C6: this split was computed with the old normaliser, and its script isn't in the repo.)*
+
 | Word type | Baseline recall | With adapter | Change | n | Significance |
 |---|---|---|---|---|---|
 | Seen in training | 56.8% | 69.0% | **+12.2 pts** | 1,339 | z = +6.5, significant |
@@ -223,7 +231,7 @@ word type during training:
 
 The improvement on familiar vocabulary is **twice** that on unfamiliar
 vocabulary, and the unfamiliar gain cannot be distinguished from noise at
-this sample size. A substantial share of the headline −15.37 points is
+this sample size. A substantial share of the headline −12.82 points is
 the adapter becoming fluent in *this corpus's particular vocabulary* —
 the Devanagari spellings of `presentation`, `slide`, `format`,
 `dialog box` that saturate these transcripts.

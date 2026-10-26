@@ -21,6 +21,15 @@ def test_normalize_is_applied_identically_to_both_sides():
     assert compute_wer("नमस्ते दुनिया।", "नमस्ते दुनिया") == 0.0
 
 
+def test_normalize_keeps_indic_vowel_signs_and_virama():
+    # Regression: the old [^\w\s] pattern deleted combining marks (C6).
+    assert normalize("इंसर्ट स्लाइड") == "इंसर्ट स्लाइड"
+    assert normalize("অবশ্যই") == "অবশ্যই"
+    assert normalize("नमस्ते। “ठीक” है?") == "नमस्ते ठीक है"
+    assert compute_wer("कि", "की") == 1.0          # different words, must not match
+    assert compute_cer("किताब", "कताब") > 0.0     # a dropped vowel sign is an error
+
+
 def test_wer_counts_substitutions_insertions_deletions():
     assert compute_wer("a b c d", "a x c d") == pytest.approx(0.25)
     assert compute_wer("a b", "a b c d") == pytest.approx(1.0)  # 2 insertions / 2 words
@@ -79,3 +88,15 @@ def test_stage2_targets_drop_only_latin_words():
     text = "लिबर ऑफिस impress में एक document बनाना"
     assert ctc_target_text(text, "drop") == "लिबर ऑफिस में एक बनाना"
     assert ctc_target_text(text, "keep") == text
+
+
+def test_demo_marks_english_written_in_devanagari_as_other_script():
+    pytest.importorskip("fastapi")
+    pytest.importorskip("indic_transliteration")
+    from demo_server import align_words
+
+    tags, deletions = align_words("अब insert और slide पर click करें", "से चुने अब इंसर्ट और स्लाइड पर क्लिक करें")
+    assert tags == ["ins", "ins", "ok", "script", "ok", "script", "ok", "script", "ok"]
+    assert deletions == 0
+    # A different word in the same slot stays a plain error.
+    assert align_words("इस pane में", "इस बटन में")[0] == ["ok", "sub", "ok"]

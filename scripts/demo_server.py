@@ -46,15 +46,41 @@ from moa_cas.adapters.language_mask import build as build_language_mask
 from moa_cas.adapters.nemo_backbone import load_backbone
 from moa_cas.adapters.router import MixtureOfAdapters, attach, build_experts
 from moa_cas.metrics import compute_cer, compute_wer, normalize
-from score_transliteration_aware import romanise
+import re
+
+from score_transliteration_aware import _edit_distance, romanise, romanise_word
 
 SAMPLE_RATE = 16000
 FRAMES_PER_SEC = 25.0
 MODES = {"base": [0.0, 1.0], "adapter": [1.0, 0.0], "router": None}
 
 
+LATIN = re.compile(r"[a-z]")
+SCRIPT_TOLERANCE = 0.4  # edit distance allowed, as a share of the romanised reference word
+
+
+def same_word_other_script(ref_word: str, hyp_word: str) -> bool:
+    """
+    True when an English (Latin-script) reference word was written in
+    Devanagari by the model and the two sound alike: `insert` vs `इंसर्ट`.
+    Display-only. WER still counts these as errors, because the backbone
+    has no Latin tokens and exact-match scoring can't credit them.
+    Tolerance 0.4 was picked by inspecting all Latin-reference
+    substitutions in the 100 demo samples: it accepts slide/स्लाइड and
+    download/डाउनलोड but leaves short words like pane/पेन red.
+    """
+    if not LATIN.search(ref_word) or LATIN.search(hyp_word):
+        return False
+    a, b = romanise_word(ref_word), romanise_word(hyp_word)
+    return bool(a) and _edit_distance(a, b) <= max(1, int(len(a) * SCRIPT_TOLERANCE))
+
+
 def align_words(ref: str, hyp: str):
-    """Word-level Levenshtein alignment -> per-hypothesis-word tags plus deletion count."""
+    """
+    Word-level Levenshtein alignment -> per-hypothesis-word tags plus
+    deletion count. Tags: ok, sub, ins, and script (a substitution where
+    the hypothesis is the reference's English word written in Devanagari).
+    """
     r, h = normalize(ref).split(), normalize(hyp).split()
     d = [[0] * (len(h) + 1) for _ in range(len(r) + 1)]
     for i in range(len(r) + 1):
@@ -67,7 +93,10 @@ def align_words(ref: str, hyp: str):
     tags, deletions, i, j = [], 0, len(r), len(h)
     while i > 0 or j > 0:
         if i > 0 and j > 0 and d[i][j] == d[i - 1][j - 1] + (r[i - 1] != h[j - 1]):
-            tags.append("ok" if r[i - 1] == h[j - 1] else "sub")
+            if r[i - 1] == h[j - 1]:
+                tags.append("ok")
+            else:
+                tags.append("script" if same_word_other_script(r[i - 1], h[j - 1]) else "sub")
             i, j = i - 1, j - 1
         elif j > 0 and d[i][j] == d[i][j - 1] + 1:
             tags.append("ins")

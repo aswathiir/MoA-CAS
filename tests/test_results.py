@@ -26,16 +26,16 @@ def mean_pct(name, col="wer"):
 
 
 @pytest.mark.parametrize("name, wer, cer", [
-    ("indicvoices_hi_ctc.csv", 7.93, 4.16),                         # ONNX, monolingual Hindi
-    ("mucs_hi_en_ctc.csv", 57.14, 56.13),                           # ONNX, code-mixed
-    ("adapter_eval/nemo_baseline_fixed.csv", 55.37, 54.40),         # NeMo baseline, mixed
-    ("adapter_eval/eval_base_pure.csv", 67.18, 56.05),              # NeMo baseline, pure Hindi
-    ("adapter_eval/eval_adapt_pure.csv", 51.81, 40.57),             # adapter (Sep 16 ckpt, overwritten)
-    ("adapter_eval/eval_adapt_mixed.csv", 45.44, 50.37),
-    ("adapter_eval/eval_adapt_pure_ckpt0917.csv", 52.84, 41.58),    # adapter (checkpoint on disk)
-    ("adapter_eval/eval_adapt_mixed_ckpt0917.csv", 46.60, 49.01),
-    ("router_eval/router_hi_id_mixed.csv", 50.50, 51.07),           # trained router
-    ("router_eval/router_hi_id_pure.csv", 58.25, 47.88),
+    ("indicvoices_hi_ctc.csv", 11.72, 4.57),                         # ONNX, monolingual Hindi
+    ("mucs_hi_en_ctc.csv", 59.69, 59.12),                           # ONNX, code-mixed
+    ("adapter_eval/nemo_baseline_fixed.csv", 58.06, 55.30),         # NeMo baseline, mixed
+    ("adapter_eval/eval_base_pure.csv", 72.28, 59.17),              # NeMo baseline, pure Hindi
+    ("adapter_eval/eval_adapt_pure.csv", 59.45, 44.22),             # adapter (Sep 16 ckpt, overwritten)
+    ("adapter_eval/eval_adapt_mixed.csv", 47.89, 48.50),
+    ("adapter_eval/eval_adapt_pure_ckpt0917.csv", 60.35, 44.97),    # adapter (checkpoint on disk)
+    ("adapter_eval/eval_adapt_mixed_ckpt0917.csv", 48.72, 48.26),
+    ("router_eval/router_hi_id_mixed.csv", 52.94, 50.03),           # trained router
+    ("router_eval/router_hi_id_pure.csv", 64.78, 50.85),
 ])
 def test_headline_wer_cer(name, wer, cer):
     assert len(rows(name)) == 100
@@ -54,19 +54,32 @@ def paired(adapter, baseline):
 
 def test_adapter_improvement_is_paired_and_significant():
     assert paired("adapter_eval/eval_adapt_pure.csv", "adapter_eval/eval_base_pure.csv") == \
-        {"better": 53, "worse": 25, "same": 22, "t": -4.84}
+        {"better": 50, "worse": 27, "same": 23, "t": -4.62}
     assert paired("adapter_eval/eval_adapt_pure_ckpt0917.csv", "adapter_eval/eval_base_pure.csv") == \
-        {"better": 55, "worse": 23, "same": 22, "t": -4.81}
-    assert paired("adapter_eval/eval_adapt_mixed_ckpt0917.csv", "adapter_eval/nemo_baseline_fixed.csv")["t"] == -3.56
+        {"better": 51, "worse": 25, "same": 24, "t": -4.45}
+    assert paired("adapter_eval/eval_adapt_mixed_ckpt0917.csv", "adapter_eval/nemo_baseline_fixed.csv")["t"] == -3.83
 
 
 def test_router_beats_base_but_not_adapter_alone():
     mixed = "router_eval/router_hi_id_mixed.csv"
-    assert paired(mixed, "adapter_eval/nemo_baseline_fixed.csv")["t"] == -2.30
-    assert paired(mixed, "adapter_eval/eval_adapt_mixed_ckpt0917.csv")["t"] == 2.75
+    assert paired(mixed, "adapter_eval/nemo_baseline_fixed.csv")["t"] == -2.59
+    assert paired(mixed, "adapter_eval/eval_adapt_mixed_ckpt0917.csv")["t"] == 2.68
     pure = "router_eval/router_hi_id_pure.csv"
-    assert paired(pure, "adapter_eval/eval_base_pure.csv")["t"] == -3.69
-    assert paired(pure, "adapter_eval/eval_adapt_pure_ckpt0917.csv")["t"] == 3.36
+    assert paired(pure, "adapter_eval/eval_base_pure.csv")["t"] == -3.57
+    assert paired(pure, "adapter_eval/eval_adapt_pure_ckpt0917.csv")["t"] == 2.85
+
+
+def test_stored_scores_match_current_metric():
+    """Guards against C6 recurring: every stored WER/CER must equal what
+    moa_cas.metrics computes from the stored reference and hypothesis."""
+    import sys
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from rescore_results import rescore_rows
+
+    for path in sorted(RESULTS.rglob("*.csv")):
+        data = list(csv.DictReader(open(path, encoding="utf-8")))
+        if data and {"reference", "hypothesis", "wer", "cer"} <= set(data[0]):
+            assert rescore_rows(data) == 0, f"{path.relative_to(ROOT)} has stale scores; run scripts/rescore_results.py"
 
 
 def test_train_and_test_speakers_are_disjoint():

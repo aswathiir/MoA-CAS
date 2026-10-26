@@ -9,6 +9,12 @@ help, and where it can go wrong.
 This is the explanatory companion to `03_PROFILE_LEARNING_ADAPTERS.md`,
 which reports results. This document explains mechanism.
 
+> **Scores corrected on 2026-10-26 (THESIS_REFERENCE C6).** The scoring code
+> used to delete Hindi vowel signs, anusvara and virama before comparing,
+> which under-counted every WER/CER by 2–7.5 points. All figures in this
+> document were rescored from the saved transcripts, except those marked
+> *(pre-C6)*, which couldn't be recomputed. Conclusions are unchanged.
+
 ---
 
 ## Part 1 — The goal, in one paragraph
@@ -229,11 +235,11 @@ benchmark on identical audio:
 
 | Configuration | WER |
 |---|---|
-| ONNX benchmark (independent reference) | 57.14% |
-| NeMo backbone, string-matched mask | 88.56% |
-| NeMo backbone, corrected block mask | 55.37% |
+| ONNX benchmark (independent reference) | 59.69% |
+| NeMo backbone, string-matched mask | 88.56% *(pre-C6)* |
+| NeMo backbone, corrected block mask | 58.06% |
 
-The corrected figure lands within 1.8 points of the reference. The
+The corrected figure lands within 1.6 points of the reference. The
 broken one is 31 points adrift. The check cost about a minute of compute
 and invalidated several hours of apparently successful training.
 
@@ -294,10 +300,10 @@ spell it in Latin" (`scripts/score_transliteration_aware.py`):
 
 | Test set | Standard CER | Transliteration-aware CER |
 |---|---|---|
-| Mixed (24.6% English), baseline | 54.40% | **33.88%** |
-| Mixed, with adapter | 50.37% | **29.59%** |
-| Pure Hindi (0% English), baseline | 56.05% | 55.03% |
-| Pure Hindi, with adapter | 40.57% | 40.10% |
+| Mixed (24.6% English), baseline | 55.30% | **33.88%** |
+| Mixed, with adapter | 48.50% | **29.59%** |
+| Pure Hindi (0% English), baseline | 59.17% | 55.03% |
+| Pure Hindi, with adapter | 44.22% | 40.10% |
 
 **About 20 points of measured error on code-switched speech is script
 mismatch, not misrecognition.** Phonetic word recall — the share of
@@ -306,10 +312,13 @@ mixed set, against a standard WER implying roughly half the words are
 wrong. The acoustic model is substantially stronger than the headline
 number suggests.
 
-The pure-Hindi rows are the control that makes this credible: with no
-English present there is no script mismatch to forgive, and the metric
-correctly finds almost nothing (56.05% → 55.03%). It fires only where
-English actually occurs.
+The pure-Hindi rows are the control: with no English present there is no
+script mismatch to forgive, yet the metric still moves 59.17% → 55.03%
+(and 44.22% → 40.10% with the adapter). So the romaniser also forgives
+about 4 points of genuine vowel errors. That's small next to the ~21-point
+move on the mixed set, but read the mixed-set gap net of it. (Before C6
+this control looked cleaner, 56.05% → 55.03%, only because the old
+normaliser had already thrown the vowel errors away.)
 
 The normaliser is approximate by construction — it collapses aspirates,
 vowel length, retroflex/dental distinctions and word-final schwa — so it
@@ -452,7 +461,7 @@ the existing decoder already knows how to read.
 
 ### The expectation
 
-The backbone knows Hindi well — roughly 8% WER on clean, elicited Hindi
+The backbone knows Hindi well — roughly 12% WER on clean, elicited Hindi
 speech. On this corpus of software tutorials it scores far worse. The gap
 is mostly **domain**: different recording conditions, dense technical
 vocabulary, spontaneous lecture delivery. The knowledge is present but
@@ -465,16 +474,16 @@ Trained on the training split, evaluated on the test split — genuinely
 held out, 520 speakers versus 30, with **zero overlap** (verified).
 
 > These figures come from the 16 Sep checkpoint, which was later overwritten. The checkpoint now on disk
-> reproduces 52.84% (pure) and 46.60% (mixed); see `THESIS_REFERENCE.md` §3.2.
+> reproduces 60.35% (pure) and 48.72% (mixed); see `THESIS_REFERENCE.md` §3.2.
 
 | Evaluation (n = 100) | Baseline | With adapter | Change |
 |---|---|---|---|
-| Pure-Hindi held-out — WER | 67.18% | **51.81%** | −15.37 points |
-| Pure-Hindi held-out — CER | 56.05% | **40.57%** | −15.48 points |
-| Full mixed test — WER | 55.37% | **45.44%** | −9.93 points |
+| Pure-Hindi held-out — WER | 72.28% | **59.45%** | −12.82 points |
+| Pure-Hindi held-out — CER | 59.17% | **44.22%** | −14.95 points |
+| Full mixed test — WER | 58.06% | **47.89%** | −10.16 points |
 
-Paired over identical utterances: 53 improved, 25 worsened, 22 unchanged;
-95% confidence interval [−0.216, −0.092]; t = −4.84. Significant.
+Paired over identical utterances: 50 improved, 27 worsened, 23 unchanged;
+95% confidence interval [−0.183, −0.073]; t = −4.62. Significant.
 
 ### The mechanism, identified
 
@@ -487,12 +496,12 @@ it holds across every utterance-length bucket.
 
 The adapter was trained on **monolingual Hindi**, so what it learned is
 domain adaptation, not code-switching. It improves the code-mixed set too
-(−9.93 points) precisely because the domain problem dominates there as
+(−10.16 points) precisely because the domain problem dominates there as
 well. This is a real result and it validates the adapter machinery — but
 it is **not yet evidence about code-switching**, which needs the English
 expert and the router, neither of which exists.
 
-Absolute quality also remains poor: a 52% word error rate is not a usable
+Absolute quality also remains poor: a 60% word error rate is not a usable
 transcription system. The honest summary is that the method moved a bad
 number meaningfully in the right direction under a very small compute
 budget.

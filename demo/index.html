@@ -21,6 +21,8 @@
     --bad-bg: #fdecea;
     --ins: #9a6700;
     --ins-bg: #fff4d6;
+    --script: #1d4ed8;
+    --script-bg: #e8efff;
   }
   * { box-sizing: border-box; }
   body {
@@ -102,6 +104,7 @@
   .w.ok { background: var(--ok-bg); color: var(--ok); }
   .w.sub { background: var(--bad-bg); color: var(--bad); }
   .w.ins { background: var(--ins-bg); color: var(--ins); text-decoration: line-through; }
+  .w.script { background: var(--script-bg); color: var(--script); }
   .stats { display: flex; gap: 8px; flex-wrap: wrap; }
   .stat { border-radius: 999px; padding: 3px 10px; font-size: 13px; background: #f3f4f6; }
   .stat b { font-weight: 600; }
@@ -111,6 +114,7 @@
   .lg-ok::before { background: var(--ok-bg); border: 1px solid var(--ok); }
   .lg-sub::before { background: var(--bad-bg); border: 1px solid var(--bad); }
   .lg-ins::before { background: var(--ins-bg); border: 1px solid var(--ins); }
+  .lg-script::before { background: var(--script-bg); border: 1px solid var(--script); }
   .lg-del::before { background: #fff; border: 1px dashed var(--muted); }
 
   .trace { border: 1px solid var(--line); border-radius: 10px; padding: 18px; margin-top: 18px; }
@@ -222,7 +226,9 @@
     <div class="ref" id="ref-box"><small>Reference</small><span id="ref-text"></span></div>
     <div class="grid3" id="outs"></div>
     <div class="legend" id="legend">
-      <span class="lg-ok">correct word</span><span class="lg-sub">wrong word</span>
+      <span class="lg-ok">correct word</span>
+      <span class="lg-script" title="The reference has the English word in Latin letters; the model wrote the same word in Devanagari. WER still counts it as wrong, because this model has no Latin letters.">same word, other script (WER counts it wrong)</span>
+      <span class="lg-sub">wrong word</span>
       <span class="lg-ins">extra word</span><span class="lg-del">missed reference words (counted)</span>
     </div>
 
@@ -389,7 +395,8 @@ function render(data) {
     const stats = hasRef ? `
       <span class="stat ${metric(r) === best && modes.length > 1 ? "best" : ""}">WER <b>${pct(metric(r))}</b></span>
       <span class="stat">CER <b>${pct(r.cer)}</b></span>
-      <span class="stat">missed <b>${r.deletions}</b></span>` : "";
+      <span class="stat">missed <b>${r.deletions}</b></span>
+      ${r.tags.includes("script") ? `<span class="stat" style="background:var(--script-bg);color:var(--script)">other script <b>${r.tags.filter((t) => t === "script").length}</b></span>` : ""}` : "";
     const share = m === "router" ? `<span class="stat">adapter share <b>${pct(r.mean_adapter_weight)}</b></span>` : "";
     return `<div class="out ${m}">
       <h3>${LABELS[m][0]} <small>${r.latency_ms} ms</small></h3>

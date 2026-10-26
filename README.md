@@ -46,19 +46,21 @@ audio ─► frozen encoder layer ─┬─► Hindi adapter ─┐
 
 ### Key results so far (each recomputed from the CSVs by `tests/test_results.py`)
 
+> **Corrected on 2026-10-26.** The scoring code used to delete Hindi vowel signs (ि ी ं ्) before comparing words, which made every error rate 2–7.5 points too low. All results were rescored from the saved transcripts. Every comparison still points the same way and is still significant. Earlier figures (for example 7.93% and 57.14% in the review deck) are the old, under-counted values. Details: [THESIS_REFERENCE §5, C6](docs/THESIS_REFERENCE.md).
+
 | What was measured (100 utterances each) | Word error rate |
 |---|---|
-| Original model on clean Hindi (IndicVoices) | **7.93%** |
-| Original model on Hindi-English tutorials (MUCS) | **57.14%** |
-| NeMo backbone, no adapter, Hindi-only part of MUCS | 67.18% |
-| Same, **with the Hindi adapter** | **52.84%**: −14.3 points, 55 better / 23 worse, t = −4.81 |
-| NeMo backbone, no adapter, full mixed MUCS | 55.37% |
-| Same, **with the Hindi adapter** | **46.60%**: −8.8 points, t = −3.56 |
-| Same, **with the MoA-CAS router** | **50.50%**: −4.9 points vs base (t = −2.30), but +3.9 vs adapter alone (t = +2.75) |
-| Router on the Hindi-only part | 58.25%: −8.9 vs base (t = −3.69), +5.4 vs adapter alone (t = +3.36) |
+| Original model on clean Hindi (IndicVoices) | **11.72%** |
+| Original model on Hindi-English tutorials (MUCS) | **59.69%** |
+| NeMo backbone, no adapter, Hindi-only part of MUCS | 72.28% |
+| Same, **with the Hindi adapter** | **60.35%**: −11.9 points, 51 better / 25 worse, t = −4.45 |
+| NeMo backbone, no adapter, full mixed MUCS | 58.06% |
+| Same, **with the Hindi adapter** | **48.72%**: −9.3 points, t = −3.83 |
+| Same, **with the MoA-CAS router** | **52.94%**: −5.1 points vs base (t = −2.59), but +4.2 vs adapter alone (t = +2.68) |
+| Router on the Hindi-only part | 64.78%: −7.5 vs base (t = −3.57), +4.4 vs adapter alone (t = +2.85) |
 
 What these numbers mean, in plain words:
-- **Most of the 7.9% → 57% gap is not code-switching.** Even pure-Hindi sentences from the tutorial corpus score ~54%. Most of the gap comes from the domain (software tutorials, recording conditions) and from how the corpus is cut into segments ([docs/01 §4](docs/01_BASELINE_AND_PROBLEM_ANALYSIS.md)).
+- **Most of the 12% → 60% gap is not code-switching.** Even pure-Hindi sentences from the tutorial corpus score ~59%. Most of the gap comes from the domain (software tutorials, recording conditions) and from how the corpus is cut into segments ([docs/01 §4](docs/01_BASELINE_AND_PROBLEM_ANALYSIS.md)).
 - **The adapter genuinely helps,** but mainly by adapting to this corpus and its vocabulary. It doesn't yet handle English ([docs/03](docs/03_PROFILE_LEARNING_ADAPTERS.md)).
 - **The router works, but it hasn't learned *language* routing yet.** It splits the signal roughly 46/54 between the adapter and the base model on almost every frame. Its choices don't follow where the English words are (r = 0.02), so it loses to simply applying the adapter everywhere.
 - **About 25% of reference words are English in Latin script, and the model has no Latin letters to write them with.** It writes `डॉक्यूमेंट` for `document`. That puts a floor of roughly 25% under word error rate that no adapter or router can remove.
@@ -175,7 +177,7 @@ scripts/             runnable entry points (benchmark, train, evaluate, score, d
 demo/index.html      the demo page served by scripts/demo_server.py
 data/manifests/      one JSON line per utterance: audio path, text, language counts, speaker
 results/             every CSV a reported number comes from
-tests/               49 tests, including ones that pin documented numbers to the CSVs
+tests/               52 tests, including ones that pin documented numbers to the CSVs
 docs/                the write-ups below
 ```
 
