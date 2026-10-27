@@ -91,10 +91,13 @@ All evaluations use the **first 100 utterances** (in manifest order) of the MUCS
 | R16 | Router (`checkpoints/router_hi_id.pt`: 38,531 steps, 5 epochs, experts hi + identity), mixed | WER **52.94%** (50.50), CER 50.03%. vs base −5.12 points (34 better / 23 worse, t = −2.59); vs adapter alone **+4.22** (16 / 33, t = +2.68) | `results/router_eval/router_hi_id_mixed.csv` | ✅ |
 | R17 | Router, pure Hindi (degradation monitoring) | WER **64.78%** (58.25), CER 50.85%. vs base −7.50 (t = −3.57); vs adapter alone **+4.43** (t = +2.85) | `results/router_eval/router_hi_id_pure.csv` | ✅ |
 | R18 | Does routing follow language? | Mean adapter share 0.47 (mixed) / 0.46 (pure). Correlation with English-word fraction across utterances: r = +0.02, i.e. none. Unaffected by C6. | R16 CSV | ✔️ |
+| R19 | What did the router learn instead? | **Layer selection, with near-hard decisions.** 98.3% of layer-by-frame weights are > 0.9 or < 0.1. Layer 5 is always on (1.00), layer 14 is 0.96; layers 2 and 4 are 0.00, 10 and 11 are 0.02 / 0.04. On average 8.0 of 17 layers are on per frame (range 3–13). | `results/router_eval/router_hi_id_layers.csv` (`scripts/router_layer_stats.py`) | ✅ `test_results.py` |
 
 **What can be claimed from R16–R18:** the router is trained end to end with only its own 1.19 M parameters, and it significantly beats the frozen base model on both sets.
 
-**What can't be claimed:** that it beats the adapter alone, or that it routes by language. It learned a nearly constant ~46% blend.
+**What can't be claimed:** that it beats the adapter alone, or that it routes by language.
+
+**What it learned instead (R19):** which layers need the adapter. The overall share of ~0.47 is an average of near on/off decisions per layer (about 8 of 17 layers on), not a half-strength blend. An earlier version of this file described it as "a nearly constant ~46% blend", which misread the layer average.
 
 **Plausible causes, not yet tested:**
 - The second expert is the unadapted backbone, not an English expert.

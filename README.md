@@ -62,7 +62,7 @@ audio ─► frozen encoder layer ─┬─► Hindi adapter ─┐
 What these numbers mean, in plain words:
 - **Most of the 12% → 60% gap is not code-switching.** Even pure-Hindi sentences from the tutorial corpus score ~59%. Most of the gap comes from the domain (software tutorials, recording conditions) and from how the corpus is cut into segments ([docs/01 §4](docs/01_BASELINE_AND_PROBLEM_ANALYSIS.md)).
 - **The adapter genuinely helps,** but mainly by adapting to this corpus and its vocabulary. It doesn't yet handle English ([docs/03](docs/03_PROFILE_LEARNING_ADAPTERS.md)).
-- **The router works, but it hasn't learned *language* routing yet.** It splits the signal roughly 46/54 between the adapter and the base model on almost every frame. Its choices don't follow where the English words are (r = 0.02), so it loses to simply applying the adapter everywhere.
+- **The router works, but it hasn't learned *language* routing yet.** It learned *which layers* need the adapter: each layer's decision is almost always fully on or fully off (98% of decisions). Layer 5 always uses the adapter and layers 2, 4, 10 and 11 never do, so on a typical frame about 8 of 17 layers use it. Averaged over layers this looks like a steady ~47% line. Its choices don't follow where the English words are (r = 0.02), and with only "Hindi adapter" or "no change" to choose from, there is nothing better to switch to on English. It therefore loses to simply applying the adapter in every layer.
 - **About 25% of reference words are English in Latin script, and the model has no Latin letters to write them with.** It writes `डॉक्यूमेंट` for `document`. That puts a floor of roughly 25% under word error rate that no adapter or router can remove.
 
 The full list of claims, numbers, sources and caveats is in **[docs/THESIS_REFERENCE.md](docs/THESIS_REFERENCE.md)**.
@@ -177,7 +177,7 @@ scripts/             runnable entry points (benchmark, train, evaluate, score, d
 demo/index.html      the demo page served by scripts/demo_server.py
 data/manifests/      one JSON line per utterance: audio path, text, language counts, speaker
 results/             every CSV a reported number comes from
-tests/               52 tests, including ones that pin documented numbers to the CSVs
+tests/               53 tests, including ones that pin documented numbers to the CSVs
 docs/                the write-ups below
 ```
 

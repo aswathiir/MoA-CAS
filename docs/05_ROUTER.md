@@ -129,7 +129,20 @@ Evaluated on the same 100 utterances as every other system (scores corrected for
 
 - The router significantly beats base on both sets (t = −2.59 / −3.57).
 - It is significantly *worse* than the adapter alone (t = +2.68 / +2.85).
-- Routing is close to a constant ~46% blend, and it doesn't track English density (r = 0.02).
+- Routing doesn't track English density (r = 0.02). What it learned instead is **layer selection** (below).
+
+**Per-layer routing** (`scripts/router_layer_stats.py`, 100 mixed test utterances, 13,975 frames, `results/router_eval/router_hi_id_layers.csv`):
+
+| Behaviour | Layers |
+|---|---|
+| Adapter always on | 5 (100% of frames), 14 (96%) |
+| Mostly on (66–79%) | 1, 12, 13, 15, 16, 17 |
+| Switching | 7 (59%), 6, 8, 9 (27–31%) |
+| Mostly or always off | 2, 4 (0%), 10, 11 (2–4%), 3 (13%) |
+
+- 98.3% of the layer-by-frame decisions are above 0.9 or below 0.1, so they're effectively hard choices, not blends.
+- On a typical frame 8.0 of 17 layers use the adapter (range 3–13).
+- The demo's "averaged over 17 layers" chart (overall share 0.47) is the mean of these on/off decisions. It does **not** mean the adapter is applied at half strength. The demo shows the per-layer heatmap underneath.
 
 See THESIS_REFERENCE R16–R18 for causes to test next. Try it live with `python scripts/demo_server.py`.
 

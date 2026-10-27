@@ -122,6 +122,13 @@
   .trace svg { width: 100%; height: auto; display: block; margin-top: 10px; }
   .rw { font-family: "Noto Sans Devanagari", Inter, sans-serif; font-size: 18px; line-height: 2.2; margin-top: 10px; }
   .rw .w { color: var(--ink); }
+  .heat-head { margin-top: 22px; font-size: 15px; font-weight: 600; }
+  .heat { display: grid; grid-template-columns: 58px minmax(0, 1fr) 46px; gap: 0 8px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+  .heat .lab { display: flex; flex-direction: column; }
+  .heat .lab div { height: 12px; line-height: 12px; white-space: nowrap; }
+  .heat .lab.right div { text-align: right; font-variant-numeric: tabular-nums; }
+  .heat svg { width: 100%; height: 204px; display: block; margin: 0; }
+  .heat-note { font-size: 13px; color: var(--muted); margin-top: 8px; }
 
   .bench { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
   .kpi { border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
@@ -234,10 +241,20 @@
 
     <div class="trace" id="trace">
       <h3>Router decisions over time</h3>
-      <div class="desc">For each 40&nbsp;ms frame, the share of the signal sent through the <b>Hindi adapter</b> (orange, top)
-        versus the <b>untouched backbone</b> (grey, bottom), averaged over the 17 encoder layers. Each word below is shaded by the same share.</div>
+      <div class="desc">The router decides separately in each of the 17 encoder layers, every 40&nbsp;ms. The orange height is the
+        <b>share of layers that use the Hindi adapter</b> at that moment; the rest pass the frame through the <b>untouched backbone</b>.
+        Each word below is shaded by the same share.</div>
       <svg id="trace-svg" viewBox="0 0 1000 170" preserveAspectRatio="none"></svg>
       <div class="rw" id="trace-words"></div>
+      <div class="heat-head">Inside the average: each layer's decision</div>
+      <div class="desc">One row per encoder layer (1 = closest to the audio). Orange = that layer sends the frame through the Hindi adapter,
+        white = it skips the adapter. The right column is how often each layer uses it on this clip.</div>
+      <div class="heat">
+        <div class="lab" id="heat-left"></div>
+        <svg id="heat-svg" viewBox="0 0 1000 204" preserveAspectRatio="none"></svg>
+        <div class="lab right" id="heat-right"></div>
+      </div>
+      <div class="heat-note" id="heat-note"></div>
     </div>
   </section>
 
@@ -427,12 +444,38 @@ function drawTrace(r, duration) {
     <rect x="0" y="${top}" width="${W}" height="${h}" fill="#f3f4f6"/>
     <path d="${area}" fill="#f26b0f" fill-opacity=".85"/>
     <line x1="0" y1="${y(0.5)}" x2="${W}" y2="${y(0.5)}" stroke="#111" stroke-dasharray="4 4" stroke-opacity=".35"/>
-    <text x="6" y="${top + 14}" font-size="12" fill="#7c2d12">adapter</text>
-    <text x="6" y="${base - 6}" font-size="12" fill="#374151">base</text>
+    <text x="6" y="${top + 14}" font-size="12" fill="#7c2d12">all 17 layers use the adapter</text>
+    <text x="6" y="${y(0.5) - 4}" font-size="12" fill="#374151">half</text>
+    <text x="6" y="${base - 6}" font-size="12" fill="#374151">none</text>
     ${marks}${ticks}`;
   $("trace-words").innerHTML = r.words.map((w) =>
     `<span class="w" title="${w.time}s · adapter ${pct(w.adapter_weight)}" style="background:rgba(242,107,15,${(0.08 + 0.75 * w.adapter_weight).toFixed(2)})">${esc(w.text)}</span>`
   ).join(" ") || "<i style='color:var(--muted)'>(nothing emitted)</i>";
+  drawHeatmap(r.layer_weights || []);
+}
+
+function drawHeatmap(lw) {
+  const L = lw.length, n = (lw[0] || []).length || 1, rowH = 12, W = 1000;
+  let cells = "";
+  lw.forEach((row, l) => {
+    // Merge runs of equal weight into one rect to keep the SVG small.
+    for (let i = 0; i < row.length;) {
+      let j = i + 1;
+      while (j < row.length && row[j] === row[i]) j++;
+      if (row[i] > 0.02) cells += `<rect x="${(i / n * W).toFixed(1)}" y="${l * rowH}" width="${((j - i) / n * W + 0.6).toFixed(1)}" height="${rowH - 1}" fill="#f26b0f" fill-opacity="${row[i].toFixed(2)}"/>`;
+      i = j;
+    }
+  });
+  $("heat-svg").setAttribute("viewBox", `0 0 ${W} ${L * rowH}`);
+  $("heat-svg").innerHTML = `<rect width="${W}" height="${L * rowH}" fill="#fff" stroke="#e5e7eb"/>${cells}`;
+  const means = lw.map((row) => row.reduce((a, b) => a + b, 0) / (row.length || 1));
+  $("heat-left").innerHTML = lw.map((_, l) => `<div>layer ${l + 1}</div>`).join("");
+  $("heat-right").innerHTML = means.map((m) => `<div>${Math.round(100 * m)}%</div>`).join("");
+  const all = lw.flat(), hard = all.filter((v) => v >= 0.9 || v <= 0.1).length / (all.length || 1);
+  const onPerFrame = Array.from({ length: n }, (_, t) => lw.filter((row) => row[t] > 0.5).length);
+  const avgOn = onPerFrame.reduce((a, b) => a + b, 0) / n;
+  $("heat-note").innerHTML = L ? `On this clip, <b>${Math.round(100 * hard)}%</b> of the layer-by-frame decisions are fully on or fully off
+    (above 90% or below 10%). On an average frame <b>${avgOn.toFixed(1)} of ${L}</b> layers use the adapter, which is what the averaged chart above shows.` : "";
 }
 
 $("src-sample").onclick = () => setSource("sample");

@@ -69,6 +69,17 @@ def test_router_beats_base_but_not_adapter_alone():
     assert paired(pure, "adapter_eval/eval_adapt_pure_ckpt0917.csv")["t"] == 2.85
 
 
+def test_router_learned_near_hard_layer_selection():
+    # THESIS_REFERENCE R19: the ~0.47 overall share is an average of on/off layers, not a blend.
+    layers = {int(r["layer"]): r for r in rows("router_eval/router_hi_id_layers.csv")}
+    assert len(layers) == 17 and int(layers[1]["n_frames"]) == 13975
+    share = lambda k: float(layers[k]["mean_adapter_weight"])
+    assert share(5) == 1.0 and share(14) == pytest.approx(0.96, abs=0.005)
+    assert all(share(k) < 0.05 for k in (2, 4, 10, 11))
+    assert round(statistics.mean(share(k) for k in layers) * 17, 1) == 8.0  # ≈ layers on per frame
+    for r in layers.values():  # nearly every decision is above 0.9 or below 0.1
+        assert float(r["share_on"]) + float(r["share_off"]) >= 0.89  # layer 13 is the softest
+
 def test_stored_scores_match_current_metric():
     """Guards against C6 recurring: every stored WER/CER must equal what
     moa_cas.metrics computes from the stored reference and hypothesis."""

@@ -147,7 +147,8 @@ class Demo:
         latency = time.time() - start
 
         n = int(enc_lens[0])
-        weights = self.moa.routing_weights()[0, :n, 0].tolist()  # weight on the adapter expert
+        layer_weights = self.moa.routing_weights(per_layer=True)[:, 0, :n, 0]  # (L, T), weight on the adapter
+        weights = layer_weights.mean(dim=0).tolist()
         ids = log_probs[0, :n].argmax(dim=-1).tolist()
 
         # Emitted tokens with the frame they were emitted on (greedy CTC collapse).
@@ -175,6 +176,7 @@ class Demo:
             "hypothesis": greedy_ctc_decode(log_probs, self.sp, self.blank_id),
             "words": words,
             "frame_weights": [round(v, 3) for v in weights],
+            "layer_weights": [[round(v, 2) for v in row] for row in layer_weights.tolist()],
             "mean_adapter_weight": round(statistics.mean(weights), 3) if weights else None,
             "latency_ms": round(1000 * latency),
         }

@@ -185,10 +185,14 @@ class MixtureOfAdapters(nn.Module):
             raise RuntimeError("No routing recorded yet — run a forward pass through the encoder first")
         return torch.stack(losses).mean()
 
-    def routing_weights(self) -> torch.Tensor:
-        """(B, T, K) router weights of the last forward pass, averaged over layers."""
-        recorded = [p for p in self._probs if p is not None]
-        return torch.stack(recorded).mean(dim=0)
+    def routing_weights(self, per_layer: bool = False) -> torch.Tensor:
+        """
+        Router weights of the last forward pass: (B, T, K) averaged over
+        layers, or (L, B, T, K) with per_layer=True. The layer average hides
+        that each layer's decision is close to hard (docs/05_ROUTER.md §6).
+        """
+        recorded = torch.stack([p for p in self._probs if p is not None])
+        return recorded if per_layer else recorded.mean(dim=0)
 
     def router_state_dict(self) -> dict:
         return {k: v.detach().cpu() for k, v in self.routers.state_dict().items()}

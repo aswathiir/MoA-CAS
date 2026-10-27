@@ -418,7 +418,9 @@ Command: `python scripts/train_router.py --lang hi --expert hi=checkpoints/hi_ad
 | Mixed | 58.06% | **48.72%** | 52.94% | −5.1 points, t = −2.59 ✅ | +4.2 points, t = +2.68 ❌ |
 | Pure Hindi | 72.28% | **60.35%** | 64.78% | −7.5 points, t = −3.57 ✅ | +4.4 points, t = +2.85 ❌ |
 
-**Reading it plainly.** The router works and significantly beats the base model, but it's significantly *worse* than simply using the adapter everywhere. It learned an almost constant blend of about 46% adapter / 54% original on nearly every frame, and that blend doesn't follow where English words are (correlation r = 0.02). In effect, it gives half the adapter's benefit everywhere.
+**Reading it plainly.** The router works and significantly beats the base model, but it's significantly *worse* than simply using the adapter everywhere. Its choices don't follow where English words are (correlation r = 0.02).
+
+**What it learned instead: which layers need the adapter.** Each of the 17 layers makes its own choice, and 98% of those choices are fully on or fully off. Layer 5 always uses the adapter, layer 14 almost always does, and layers 2, 4, 10 and 11 practically never do. On a typical 40 ms frame about 8 of the 17 layers use it. The demo's top chart averages these on/off choices, so it shows a steady line near 47%. That does **not** mean the adapter is applied at half strength; the heatmap under it shows the per-layer choices. Using the adapter in only about half the layers gives part of the adapter's benefit, which is why the router lands between the base model and the adapter alone.
 
 **Likely reasons, not yet tested:**
 - Its second expert is "no change", not an English specialist, so there's nothing language-specific to route to.
