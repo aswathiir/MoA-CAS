@@ -52,5 +52,5 @@ have been downloaded, processed, and verified — not just written.
 1. Decide how to handle the Dravidian-CS gap (different corpus, or the
    synthetic TTS augmentation from the project doc)
 2. Merge `aswathi-dataset` into `main` when ready
-3. Begin the MoA-CAS architecture itself — adapters, router, two-stage
+3. *(Done since: adapters in `03_PROFILE_LEARNING_ADAPTERS.md`, router in `05_ROUTER.md`.)* Begin the MoA-CAS architecture itself — adapters, router, two-stage
    training — using these manifests as input (needs a compute decision first)
